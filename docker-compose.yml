@@ -1,20 +1,21 @@
 version: '3.8'
 
 services:
-  python_engine:
-    build: 
-      context: ./python_backend
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: beast2711/dharma-lens-frontend:latest
     ports:
-      - "8000:8000"
-    environment:
-      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
-      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - "8080:80"
+    depends_on:
+      - node_gateway
 
   node_gateway:
     build:
       context: ./node_backend
+      dockerfile: Dockerfile
+    image: beast2711/dharma-lens-node:latest
     ports:
       - "3000:3000"
     environment:
@@ -24,3 +25,15 @@ services:
     depends_on:
       - python_engine
 
+  python_engine:
+    build:
+      context: ./python_backend
+      dockerfile: Dockerfile
+    image: beast2711/dharma-lens-python:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
