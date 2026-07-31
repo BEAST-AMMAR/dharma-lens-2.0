@@ -1,0 +1,186 @@
+import { useState, useCallback } from "react";
+import { useDropzone } from "react-dropzone";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+import { Upload, File, X, CheckCircle2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { ACCEPTED_MIME_TYPES } from "@/lib/fileTypes";
+
+// Sanitize filenames to avoid storage InvalidKey errors (spaces, Unicode, punctuation)
+const sanitizeFileName = (name: string) => {
+  const dot = name.lastIndexOf(".");
+  const base = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot + 1) : "";
+  const normalized = base.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  const cleaned = normalized.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+  const trimmed = cleaned.replace(/\.+$/g, "").slice(0, 120) || "file";
+  const safeExt = ext.toLowerCase().replace(/[^a-z0-9]+/g, "");
+  return safeExt ? `${trimmed}.${safeExt}` : trimmed;
+};
+
+interface UploadedFile {
+  file: File;
+  progress: number;
+  status: "uploading" | "complete" | "error";
+  id: string;
+  path?: string;
+}
+
+interface DocumentUploadProps {
+  onUploadComplete?: (filePath: string) => void;
+}
+
+const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
+  const { toast } = useToast();
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
+    const newFiles = acceptedFiles.map(file => ({
+      file,
+      id: crypto.randomUUID(),
+      progress: 0,
+      status: "uploading" as const,
+    }));
+
+    setFiles(prev => [...prev, ...newFiles]);
+
+    // Process each file
+    for (const fileObj of newFiles) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not authenticated");
+
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) throw new Error("Session expired");
+
+        const safeName = sanitizeFileName(fileObj.file.name);
+        const filePath = `${user.id}/${Date.now()}_${safeName}`;
+
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const url = `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/documents/${filePath}`;
+          
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const progress = Math.round((event.loaded / event.total) * 100);
+              setFiles(prev => prev.map(f => f.id === fileObj.id ? { ...f, progress } : f));
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              setFiles(prev => prev.map(f => f.id === fileObj.id ? { ...f, status: "complete", progress: 100, path: filePath } : f));
+              resolve();
+            } else {
+              reject(new Error(xhr.responseText || "Upload failed"));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error("Network error during upload"));
+
+          xhr.open("POST", url, true);
+          xhr.setRequestHeader("Authorization", `Bearer ${sessionData.session.access_token}`);
+          xhr.setRequestHeader("apikey", import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY);
+          xhr.setRequestHeader("Content-Type", fileObj.file.type || "application/octet-stream");
+          xhr.send(fileObj.file);
+        });
+
+        toast({
+          title: "Upload successful",
+          description: `${fileObj.file.name} uploaded successfully`,
+        });
+
+        if (onUploadComplete) {
+          onUploadComplete(filePath);
+        }
+      } catch (error: any) {
+        setFiles(prev => prev.map(f => f.id === fileObj.id ? { ...f, status: "error" } : f));
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: error.message || "An error occurred",
+        });
+      }
+    }
+  }, [toast, onUploadComplete]);
+
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    onDrop,
+    accept: ACCEPTED_MIME_TYPES,
+    maxSize: 50 * 1024 * 1024,
+  });
+
+  const removeFile = (id: string) => {
+    setFiles(prev => prev.filter(f => f.id !== id));
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Dropzone */}
+      <div
+        {...getRootProps()}
+        className={`
+          border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
+          transition-colors duration-200
+          ${isDragActive 
+            ? "border-legal-gold bg-legal-gold-light" 
+            : "border-border hover:border-legal-gold hover:bg-muted/50"
+          }
+        `}
+      >
+        <input {...getInputProps()} />
+        <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+        <p className="text-lg font-medium mb-2">
+          {isDragActive ? "Drop files here..." : "Drag & drop files here"}
+        </p>
+        <p className="text-sm text-muted-foreground mb-4">
+          or click to browse files
+        </p>
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p>Supported: PDF, Images (JPG, PNG, TIFF), Audio (WAV, MP3, M4A)</p>
+          <p>Max 50MB per file • Up to 10 files at once</p>
+        </div>
+      </div>
+
+      {/* File List */}
+      {files.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="font-medium">Uploaded Files</h3>
+          {files.map((uploadedFile) => (
+            <div
+              key={uploadedFile.id}
+              className="flex items-center gap-3 p-3 border rounded-lg bg-card"
+            >
+              <File className="h-8 w-8 text-legal-gold shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">
+                  {uploadedFile.file.name}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {(uploadedFile.file.size / 1024 / 1024).toFixed(2)} MB
+                </p>
+                {uploadedFile.status === "uploading" && (
+                  <Progress value={uploadedFile.progress} className="mt-2 h-1" />
+                )}
+              </div>
+              {uploadedFile.status === "complete" && (
+                <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => removeFile(uploadedFile.id)}
+                className="shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default DocumentUpload;

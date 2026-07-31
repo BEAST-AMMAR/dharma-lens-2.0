@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    /* Indian Legal Professional Theme */
+    --background: 0 0% 100%;
+    --foreground: 220 40% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 40% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 40% 12%;
+
+    /* Navy blue for legal authority */
+    --primary: 220 70% 22%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 220 70% 18%;
+
+    /* Gold accent for Indian heritage */
+    --secondary: 38 92% 50%;
+    --secondary-foreground: 220 70% 12%;
+    
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 14% 40%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 220 70% 12%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 14% 90%;
+    --input: 220 14% 90%;
+    --ring: 220 70% 22%;
+
+    --radius: 0.5rem;
+
+    /* Custom tokens for legal theme */
+    --legal-navy: 220 70% 22%;
+    --legal-gold: 38 92% 50%;
+    --legal-gold-light: 38 92% 95%;
+    --success-green: 142 76% 36%;
+    --processing-blue: 217 91% 60%;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(220 70% 22% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(220 70% 22% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(220 70% 22% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(220 70% 22% / 0.15);
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(220 70% 22%), hsl(220 70% 32%));
+    --gradient-gold: linear-gradient(135deg, hsl(38 92% 50%), hsl(38 92% 60%));
+    --gradient-hero: linear-gradient(135deg, hsl(220 70% 22%), hsl(220 70% 35%), hsl(38 92% 50%));
+  }
+
+  .dark {
+    --background: 220 40% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 220 40% 10%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 220 40% 10%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 38 92% 50%;
+    --primary-foreground: 220 70% 12%;
+    --primary-hover: 38 92% 55%;
+
+    --secondary: 220 40% 15%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 220 40% 15%;
+    --muted-foreground: 220 14% 65%;
+
+    --accent: 38 92% 50%;
+    --accent-foreground: 220 70% 12%;
+
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 40% 20%;
+    --input: 220 40% 20%;
+    --ring: 38 92% 50%;
+
+    --legal-navy: 220 70% 30%;
+    --legal-gold: 38 92% 50%;
+    --legal-gold-light: 38 92% 15%;
+    --success-green: 142 76% 45%;
+    --processing-blue: 217 91% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}

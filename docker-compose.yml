@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  python_engine:
+    build: 
+      context: ./python_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+
+  node_gateway:
+    build:
+      context: ./node_backend
+    ports:
+      - "3000:3000"
+    environment:
+      - PYTHON_ENGINE_URL=http://python_engine:8000/process
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    depends_on:
+      - python_engine
+

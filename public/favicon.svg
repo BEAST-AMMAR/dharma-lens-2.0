@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F59E0B"/>
+      <stop offset="50%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="#B45309"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="100%" stop-color="#0284C7"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  
+  <!-- Background Shield/Rounded Base -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="none" stroke="url(#goldGrad)" stroke-width="8" opacity="0.4"/>
+  
+  <!-- Outer AI Lens Circle -->
+  <circle cx="256" cy="256" r="180" fill="none" stroke="url(#cyanGrad)" stroke-width="10" stroke-dasharray="16 12" opacity="0.8"/>
+  <circle cx="256" cy="256" r="150" fill="none" stroke="url(#goldGrad)" stroke-width="14" filter="url(#glow)"/>
+  
+  <!-- Scales of Justice Symbol -->
+  <g transform="translate(0, -10)">
+    <!-- Central Pillar -->
+    <path d="M 256 120 L 256 340" stroke="url(#goldGrad)" stroke-width="16" stroke-linecap="round"/>
+    <path d="M 220 340 L 292 340" stroke="url(#goldGrad)" stroke-width="16" stroke-linecap="round"/>
+    <!-- Top Decorative Finial / Lens Sparkle -->
+    <circle cx="256" cy="115" r="18" fill="url(#goldGrad)"/>
+    <path d="M 256 80 L 256 100 M 256 130 L 256 150 M 221 115 L 241 115 M 271 115 L 291 115" stroke="url(#cyanGrad)" stroke-width="6" stroke-linecap="round"/>
+    
+    <!-- Balance Beam -->
+    <path d="M 140 180 Q 256 170 372 180" fill="none" stroke="url(#goldGrad)" stroke-width="14" stroke-linecap="round"/>
+    
+    <!-- Left Scale Pan -->
+    <path d="M 140 180 L 105 260 M 140 180 L 175 260" stroke="url(#goldGrad)" stroke-width="6" opacity="0.8"/>
+    <path d="M 90 260 Q 140 295 190 260 Z" fill="url(#goldGrad)"/>
+    
+    <!-- Right Scale Pan -->
+    <path d="M 372 180 L 337 260 M 372 180 L 407 260" stroke="url(#goldGrad)" stroke-width="6" opacity="0.8"/>
+    <path d="M 322 260 Q 372 295 422 260 Z" fill="url(#goldGrad)"/>
+  </g>
+  
+  <!-- AI Sparkle Nodes -->
+  <circle cx="372" cy="180" r="10" fill="#38BDF8" filter="url(#glow)"/>
+  <circle cx="140" cy="180" r="10" fill="#38BDF8" filter="url(#glow)"/>
+  <circle cx="256" cy="256" r="8" fill="#F59E0B"/>
+</svg>
