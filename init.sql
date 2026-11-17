@@ -8,9 +8,25 @@ CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) UNIQUE NOT NULL,
   full_name VARCHAR(255),
+  role VARCHAR(50) DEFAULT 'user',
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Seed Default System Administrator
+INSERT INTO users (id, email, full_name, role, created_at, updated_at)
+VALUES (
+  'a0000000-0000-0000-0000-000000000001',
+  'admin@vidhichakshu.com',
+  'VidhiChakshu System Administrator',
+  'admin',
+  NOW(),
+  NOW()
+)
+ON CONFLICT (email) DO UPDATE 
+SET full_name = EXCLUDED.full_name,
+    role = 'admin',
+    updated_at = NOW();
 
 -- ============================================
 -- DOCUMENTS TABLE
