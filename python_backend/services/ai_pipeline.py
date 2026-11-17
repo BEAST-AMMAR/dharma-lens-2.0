@@ -404,16 +404,45 @@ def process_document_pipeline(document_path: str, config: dict, auth_token: str)
     7. Translates to target Indian language
     8. Extracts structured entities (People, Orgs, Locations, Dates)
     """
-    # 1. Download file from Supabase Storage
-    try:
-        supabase = get_supabase_client(auth_token)
-        res = supabase.storage.from_("documents").download(document_path)
-    except Exception as download_err:
-        print(f"[VidhiChakshu Download Notice]: Retrying with service role client ({download_err})...")
-        supabase = get_supabase_client(None)
-        res = supabase.storage.from_("documents").download(document_path)
+    # 1. Download file from local disk or Supabase Storage
+    file_bytes = None
+    if os.path.exists(document_path):
+        try:
+            with open(document_path, "rb") as f:
+                file_bytes = f.read()
+        except Exception as local_read_err:
+            print(f"[VidhiChakshu Local Read Notice]: {local_read_err}")
 
-    file_bytes = res
+    if file_bytes is None:
+        # Check relative paths in uploads directory
+        possible_paths = [
+            os.path.join("uploads", os.path.basename(document_path)),
+            os.path.join("..", "uploads", os.path.basename(document_path)),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "uploads", os.path.basename(document_path)))
+        ]
+        for p in possible_paths:
+            if os.path.exists(p):
+                try:
+                    with open(p, "rb") as f:
+                        file_bytes = f.read()
+                    print(f"[VidhiChakshu] Loaded local document: {p} ({len(file_bytes)} bytes)")
+                    break
+                except Exception:
+                    pass
+
+    if file_bytes is None:
+        try:
+            supabase = get_supabase_client(auth_token)
+            res = supabase.storage.from_("documents").download(document_path)
+            file_bytes = res
+        except Exception as download_err:
+            print(f"[VidhiChakshu Download Notice]: Retrying with service role client ({download_err})...")
+            try:
+                supabase = get_supabase_client(None)
+                res = supabase.storage.from_("documents").download(document_path)
+                file_bytes = res
+            except Exception as final_err:
+                raise Exception(f"Failed to access document from disk or cloud storage: {final_err}")
     extracted_text = ""
     htr_metadata = None
     lower_path = document_path.lower()

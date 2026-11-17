@@ -35,19 +35,45 @@ const Dashboard = () => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      let activeSession = session;
+      if (!activeSession) {
+        try {
+          const raw = localStorage.getItem("vidhichakshu_offline_session");
+          if (raw) {
+            activeSession = JSON.parse(raw);
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
+      setSession(activeSession);
       setIsLoading(false);
-      if (!session) {
+      if (!activeSession) {
         navigate("/auth");
       } else {
         fetchHistory();
       }
+    }).catch(() => {
+      // Offline fallback check on network rejection
+      try {
+        const raw = localStorage.getItem("vidhichakshu_offline_session");
+        if (raw) {
+          const activeSession = JSON.parse(raw);
+          setSession(activeSession);
+          setIsLoading(false);
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+      setIsLoading(false);
+      navigate("/auth");
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (!session) {
-        navigate("/auth");
+      if (session) {
+        setSession(session);
       }
     });
 
@@ -55,9 +81,20 @@ const Dashboard = () => {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      // ignore
+    }
+    try {
+      localStorage.removeItem("vidhichakshu_offline_session");
+      const storageKey = Object.keys(localStorage).find(k => k.startsWith("sb-") && k.endsWith("-auth-token"));
+      if (storageKey) localStorage.removeItem(storageKey);
+    } catch (e) {
+      // ignore
+    }
     toast({ title: "Logged out successfully" });
-    navigate("/");
+    navigate("/auth");
   };
 
   const handleSelectHistoryItem = (item: any) => {
