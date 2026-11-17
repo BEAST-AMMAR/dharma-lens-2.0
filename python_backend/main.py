@@ -1,7 +1,6 @@
 import sys
 import os
 import glob
-import site
 import pydantic
 from dotenv import load_dotenv
 
@@ -13,25 +12,13 @@ try:
     except ImportError:
         pydantic_v1 = pydantic
     sys.modules['langchain_core.pydantic_v1'] = pydantic_v1
-except Exception as _lc_err:
+except Exception:
     pass
 
-# 1. Import binary/core framework dependencies first using active interpreter environment
-from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Header, Depends, BackgroundTasks, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uuid
-
-# Append user site-packages for the current Python interpreter version if present
-user_site = site.getusersitepackages()
-if os.path.exists(user_site) and user_site not in sys.path:
-    sys.path.append(user_site)
-
-# Ensure active hermes-agent venv site-packages is included
-hermes_venv_site = os.path.expanduser(r"~\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages")
-if os.path.exists(hermes_venv_site) and hermes_venv_site not in sys.path:
-    sys.path.append(hermes_venv_site)
-
 from supabase import create_client
 
 load_dotenv()
@@ -47,12 +34,19 @@ if not SUPABASE_URL:
 if not SUPABASE_KEY:
     raise RuntimeError("CRITICAL: VITE_SUPABASE_ANON_KEY environment variable is missing. Refusing to start.")
 
-app = FastAPI(title="Dharma Lens ML Engine", version="3.0.0")
+app = FastAPI(title="VidhiChakshu AI Engine", version="3.0.0")
 
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "http://localhost:3000", "http://localhost:5173", "https://dharma-lens.vercel.app"],
+    allow_origins=[
+        "http://localhost:8080",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://vidhichakshu.vercel.app",
+        "https://vidhichakshu.ai",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,27 +75,30 @@ class ChatRequest(BaseModel):
     chat_history: list
     config: dict = None
 
+class ExportPDFRequest(BaseModel):
+    document_data: dict
+
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "Dharma Lens ML Engine", "version": "3.0.0"}
+    return {"status": "ok", "service": "VidhiChakshu AI Engine", "version": "3.0.0"}
 
-# Instantiate module-level Supabase client once at startup
+# Module-level Supabase client for auth verification
 supabase_auth_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def verify_supabase_token(authorization: str):
     """
     Validates the JWT token against Supabase Auth.
-    Uses environment-validated SUPABASE_URL and SUPABASE_KEY (no hardcoded fallbacks).
+    Returns the authenticated user object.
     """
     if not authorization:
         raise HTTPException(status_code=401, detail="Unauthorized - Missing Authorization Header")
     token = authorization.replace("Bearer ", "")
     
     try:
-        user = supabase_auth_client.auth.get_user(token)
-        if not user or not getattr(user, 'user', None):
+        user_response = supabase_auth_client.auth.get_user(token)
+        if not user_response or not getattr(user_response, 'user', None):
             raise HTTPException(status_code=401, detail="Invalid Authentication Token")
-        return user
+        return user_response.user
     except HTTPException:
         raise
     except Exception as e:
@@ -114,9 +111,14 @@ async def chat_with_document(request: ChatRequest, authorization: str = Header(N
     try:
         from services.ai_pipeline import call_llm_hybrid
         
-        system_prompt = f"You are an expert Indian Legal AI assistant. Answer the user's query precisely using ONLY the following document context:\n\n{request.document_text[:15000]}"
+        system_prompt = (
+            "You are VidhiChakshu (विधि-चक्षु), an expert Indian Legal and Historical Document AI assistant. "
+            "Answer the user's questions with high legal precision, citing relevant statutory sections, "
+            "parties, plot boundaries, and archaic terms when applicable. "
+            f"Use ONLY the following document context:\n\n{request.document_text[:15000]}"
+        )
         
-        user_prompt = "History:\n"
+        user_prompt = "Conversation History:\n"
         for msg in request.chat_history:
             user_prompt += f"{msg.get('role', 'user')}: {msg.get('content', '')}\n"
         user_prompt += f"\nUser: {request.query}"
@@ -130,44 +132,179 @@ async def chat_with_document(request: ChatRequest, authorization: str = Header(N
         
         return {"success": True, "reply": response}
     except Exception as e:
-        print(f"Chat Error: {str(e)}")
+        print(f"[VidhiChakshu Chat Error]: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-# In-memory job store for local development (replaces Redis/Celery)
+# In-memory job store for fast polling
 job_store = {}
 
-def background_process(job_id: str, document_path: str, config: dict, auth_token: str):
+def background_process(job_id: str, document_path: str, config: dict, auth_token: str, user_id: str):
+    """
+    Executes the document intelligence pipeline in background and persists results to Supabase.
+    """
+    from services.ai_pipeline import get_supabase_client, process_document_pipeline
+    
+    sp = get_supabase_client(auth_token)
+    
+    # 1. Record job start in Supabase database
     try:
-        from services.ai_pipeline import process_document_pipeline
+        sp.table("processing_jobs").insert({
+            "id": job_id,
+            "document_id": document_path,
+            "user_id": user_id,
+            "config": config,
+            "status": "processing"
+        }).execute()
+    except Exception as e:
+        print(f"[VidhiChakshu DB Notice]: Could not create processing_jobs record: {e}")
+
+    try:
         job_store[job_id] = {"status": "processing"}
         result = process_document_pipeline(document_path, config, auth_token)
+        
+        # 2. Update memory store
         job_store[job_id] = {"status": "completed", "result": result}
+        
+        # 3. Persist completed results to Supabase processing_results table
+        try:
+            sp.table("processing_jobs").update({
+                "status": "completed"
+            }).eq("id", job_id).execute()
+
+            sp.table("processing_results").insert({
+                "job_id": job_id,
+                "document_id": document_path,
+                "user_id": user_id,
+                "extracted_text": result.get("extracted_text", ""),
+                "summary": result.get("summary", ""),
+                "translation": result.get("translation", ""),
+                "entities": result.get("entities", {}),
+                "legal_analysis": result.get("legal_analysis", {}),
+                "audio_transcription": result.get("audio_transcription"),
+                "metadata": {
+                    "document_path": document_path,
+                    "htrMetadata": result.get("htrMetadata"),
+                    "redacted_text": result.get("redacted_text"),
+                    "layman_summary": result.get("layman_summary"),
+                    "archaic_terms": result.get("archaic_terms", []),
+                    "chauhaddi": result.get("chauhaddi", {}),
+                    "lineage": result.get("lineage", {}),
+                    "title_chain": result.get("title_chain", []),
+                    "title_health_score": result.get("title_health_score", 85),
+                    "title_defects": result.get("title_defects", [])
+                }
+            }).execute()
+            print(f"[VidhiChakshu DB] Successfully persisted processing result for job {job_id}")
+        except Exception as db_err:
+            print(f"[VidhiChakshu DB Error]: Failed to save result to Supabase: {db_err}")
+
     except Exception as e:
-        print(f"[Background Job {job_id} FAILED]: {str(e)}")
+        print(f"[VidhiChakshu Background Job {job_id} FAILED]: {str(e)}")
         job_store[job_id] = {"status": "failed", "error": str(e)}
+        try:
+            sp.table("processing_jobs").update({
+                "status": "failed",
+                "error_message": str(e)
+            }).eq("id", job_id).execute()
+        except Exception:
+            pass
 
 @app.post("/process")
 async def process_document(request: ProcessRequest, background_tasks: BackgroundTasks, authorization: str = Header(None)):
-    verify_supabase_token(authorization)
+    user = verify_supabase_token(authorization)
+    user_id = str(user.id)
     
     try:
         job_id = str(uuid.uuid4())
         job_store[job_id] = {"status": "pending"}
-        background_tasks.add_task(background_process, job_id, request.documentPath, request.config.dict(), authorization)
+        config_dict = request.config.model_dump() if hasattr(request.config, 'model_dump') else request.config.dict()
+        
+        background_tasks.add_task(
+            background_process, 
+            job_id, 
+            request.documentPath, 
+            config_dict, 
+            authorization, 
+            user_id
+        )
         
         return {"success": True, "job_id": job_id}
     except Exception as e:
-        print(f"Error in python ML engine: {str(e)}")
+        print(f"Error in VidhiChakshu AI engine: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/job/{job_id}")
 async def get_job_status(job_id: str, authorization: str = Header(None)):
-    verify_supabase_token(authorization)
+    user = verify_supabase_token(authorization)
+    
+    # 1. Check in-memory store
     job = job_store.get(job_id)
-    if not job:
-        return {"status": "failed", "error": "Job not found"}
-    return job
+    if job:
+        return job
+        
+    # 2. Fallback to Supabase database if memory store doesn't have it
+    try:
+        from services.ai_pipeline import get_supabase_client
+        sp = get_supabase_client(authorization)
+        res = sp.table("processing_results").select("*").eq("job_id", job_id).execute()
+        if res.data and len(res.data) > 0:
+            db_row = res.data[0]
+            db_meta = db_row.get("metadata") or {}
+            result_obj = {
+                "text": db_row.get("extracted_text"),
+                "extracted_text": db_row.get("extracted_text"),
+                "redacted_text": db_meta.get("redacted_text") or db_row.get("extracted_text"),
+                "summary": db_row.get("summary"),
+                "layman_summary": db_meta.get("layman_summary"),
+                "archaic_terms": db_meta.get("archaic_terms", []),
+                "chauhaddi": db_meta.get("chauhaddi", {}),
+                "lineage": db_meta.get("lineage", {}),
+                "title_chain": db_meta.get("title_chain", []),
+                "title_health_score": db_meta.get("title_health_score", 85),
+                "title_defects": db_meta.get("title_defects", []),
+                "translation": db_row.get("translation"),
+                "legalAnalysis": db_row.get("legal_analysis"),
+                "legal_analysis": db_row.get("legal_analysis"),
+                "entities": db_row.get("entities"),
+                "htrMetadata": db_meta.get("htrMetadata"),
+                "audio_transcription": db_row.get("audio_transcription")
+            }
+            return {"status": "completed", "result": result_obj}
+            
+        # Check processing_jobs table
+        job_res = sp.table("processing_jobs").select("*").eq("id", job_id).execute()
+        if job_res.data and len(job_res.data) > 0:
+            db_job = job_res.data[0]
+            status = db_job.get("status", "pending")
+            if status == "failed":
+                return {"status": "failed", "error": db_job.get("error_message", "Job failed")}
+            return {"status": status}
+    except Exception as e:
+        print(f"[VidhiChakshu Job Status Notice]: {e}")
+        
+    return {"status": "failed", "error": "Job not found"}
+
+@app.post("/export-pdf")
+@app.post("/api/export-pdf")
+async def export_certified_pdf(request: ExportPDFRequest, authorization: str = Header(None)):
+    verify_supabase_token(authorization)
+    try:
+        from services.pdf_generator import generate_certified_pdf_report
+        pdf_bytes = generate_certified_pdf_report(request.document_data)
+        doc_raw = str(request.document_data.get("document_id") or "Certified_Report")
+        doc_name = doc_raw.split("/")[-1].split(".")[0]
+        filename = f"VidhiChakshu_{doc_name}_Brief.pdf"
+        
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except Exception as e:
+        print(f"[VidhiChakshu PDF Export Error]: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate certified PDF: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

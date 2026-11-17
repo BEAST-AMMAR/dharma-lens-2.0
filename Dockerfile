@@ -3,27 +3,33 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Copy dependency definitions first for better caching
 COPY package*.json ./
+
+# Install dependencies
 RUN npm ci
 
+# Copy source code
 COPY . .
+
+# Build frontend
 RUN npm run build
 
 # Stage 2: Serve via Nginx
 FROM nginx:alpine
 
+# Copy built frontend from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Nginx SPA Routing configuration
-RUN echo 'server { \
-    listen 80; \
-    location / { \
-        root /usr/share/nginx/html; \
-        index index.html index.htm; \
-        try_files $uri $uri/ /index.html; \
-    } \
-}' > /etc/nginx/conf.d/default.conf
+# Copy nginx configuration for SPA routing
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
+# Expose port
 EXPOSE 80
 
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost/index.html || exit 1
+
+# Start nginx
 CMD ["nginx", "-g", "daemon off;"]

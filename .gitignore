@@ -7,29 +7,71 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependencies
+node_modules/
+node_backend/node_modules/
+.pnp
+.pnp.js
 
-# Environment Variables
+# Build output
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# Environment & Secrets (NEVER COMMIT CREDENTIALS)
 .env
 .env.local
 .env.*.local
-# Editor directories and files
+*.pem
+*.key
+*.cert
+
+# Editor & System Files
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
+Desktop.ini
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
 
-# Python
+# Python & ML Caching
 venv/
+.venv/
+env/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 .pytest_cache/
+.mypy_cache/
+*.egg-info/
+models/
+ml_cache/
+*.pt
+*.bin
+*.onnx
 
+# Documentation Drafts & Temporary Artifacts
+*.pdf
+documentation/images/
+documentation/drafts/
+*.audit.md
+*MIGRATION_PLAN*.md
+*ARCHIVE*.md
+~*
+*.tmp
+*.bak
+
+# Testing & Coverage
+coverage/
+.coverage
+htmlcov/
+.nyc_output/
+
+# Supabase temp files
+supabase/.temp/

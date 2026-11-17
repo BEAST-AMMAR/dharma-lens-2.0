@@ -1,47 +1,47 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Scale, Brain, Languages, FileText, Mic, Shield, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Scale, Brain, Languages, FileText, Mic, Shield, ArrowRight, CheckCircle2, Scroll, BookOpen, Users } from "lucide-react";
 
 const Index = () => {
   const features = [
     {
-      icon: FileText,
-      title: "Advanced OCR",
-      description: "Extract text from legal documents with 99%+ accuracy using multiple OCR engines",
+      icon: Scroll,
+      title: "Historical & Ancient Scripts (HTR)",
+      description: "Transcribe and transliterate century-old Modi script land records, Halegannada (Old Kannada), and Perso-Arabic Nastaliq revenue deeds into modern standard text.",
     },
     {
-      icon: Brain,
-      title: "AI Summarization",
-      description: "Generate concise summaries using state-of-the-art large language models",
+      icon: Users,
+      title: "Citizen-Friendly Layman Explanation",
+      description: "Explains complex property deeds, wills, and court filings in simple plain words for everyday citizens, farmers, and property buyers.",
     },
     {
-      icon: Languages,
-      title: "Multi-Language Translation",
-      description: "Translate to 22+ Indian languages with context-aware accuracy",
-    },
-    {
-      icon: Mic,
-      title: "Audio Transcription",
-      description: "Convert court hearings and legal recordings to text with speaker diarization",
+      icon: BookOpen,
+      title: "Archaic Revenue Lexicon",
+      description: "Automatically detects and clarifies 250+ historical revenue terms like Khasra, Jamabandi, Bainama, Watandar, Sanad, Inam, and Chauhaddi.",
     },
     {
       icon: Shield,
-      title: "Constitutional Analysis",
-      description: "AI-powered analysis of Indian Constitution articles and legal precedents",
+      title: "BNS & Property Law Intelligence",
+      description: "Direct statutory mapping from legacy colonial codes (IPC, CrPC, Evidence Act) to modern laws (BNS, BNSS, BSA) and Transfer of Property Act provisions.",
     },
     {
-      icon: CheckCircle2,
-      title: "Entity Extraction",
-      description: "Automatically identify parties, dates, citations, and 10+ entity types",
+      icon: Languages,
+      title: "22+ Indian Languages Translation",
+      description: "Context-aware legal translation into Hindi, Marathi, Kannada, Bengali, Tamil, Telugu, Gujarati, and other official languages.",
+    },
+    {
+      icon: Mic,
+      title: "Court Audio Transcription",
+      description: "Convert recorded court proceedings, witness statements, and legal conferences to verbatim text using offline speech AI.",
     },
   ];
 
   const stats = [
-    { value: "High", label: "OCR Accuracy" },
-    { value: "22+", label: "Languages" },
-    { value: "10+", label: "Entity Types" },
-    { value: "Fast", label: "Processing Time" },
+    { value: "300+ Yrs", label: "Heritage Deeds Deciphered" },
+    { value: "250+", label: "Archaic Terms Cataloged" },
+    { value: "22+", label: "Indian Languages" },
+    { value: "100%", label: "Privacy & Air-Gap Ready" },
   ];
 
   return (
@@ -53,29 +53,30 @@ const Index = () => {
           <div className="max-w-4xl mx-auto text-center space-y-8">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-legal-gold-light border border-legal-gold/30">
               <Scale className="h-4 w-4 text-legal-gold" />
-              <span className="text-sm font-medium text-foreground">Indian Legal Document AI Processing</span>
+              <span className="text-sm font-medium text-foreground">VidhiChakshu (विधि-चक्षु) — The AI Vision for Indian Legal & Heritage Documents</span>
             </div>
 
             <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight">
-              Transform Legal Documents with{" "}
-              <span className="text-legal-gold">AI-Powered Intelligence</span>
+              Decipher Centuries of Law with{" "}
+              <span className="text-legal-gold">VidhiChakshu AI</span>
             </h1>
 
-            <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto">
-              Professional AI platform for OCR, summarization, translation, and constitutional analysis 
-              of Indian legal documents. Built for legal professionals, by legal tech experts.
+            <p className="text-lg md:text-xl text-white/90 max-w-3xl mx-auto leading-relaxed">
+              Read, transcribe, transliterate, and understand ancient land deeds, handwritten court files, 
+              and historical Indian scripts (Modi, Halegannada, Nastaliq). Empowering common citizens with 
+              simple explanations and advocates with statutory precision.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/auth">
                 <Button size="lg" className="bg-legal-gold hover:bg-legal-gold/90 text-legal-navy font-semibold">
-                  Get Started Free
+                  Start Processing Documents
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link to="/auth">
                 <Button size="lg" variant="outline" className="bg-white/10 hover:bg-white/20 text-white border-white/30">
-                  View Demo
+                  Explore Heritage Demo
                 </Button>
               </Link>
             </div>
@@ -100,10 +101,10 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center max-w-3xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Comprehensive Legal AI Suite
+              Comprehensive Heritage & Legal Document Intelligence
             </h2>
             <p className="text-lg text-muted-foreground">
-              Everything you need to process, analyze, and understand Indian legal documents
+              Bridging historical manuscripts and modern justice for citizens, advocates, and courts
             </p>
           </div>
 
@@ -130,14 +131,14 @@ const Index = () => {
         <div className="container mx-auto px-4 text-center">
           <div className="max-w-3xl mx-auto space-y-8">
             <h2 className="text-3xl md:text-4xl font-bold text-white">
-              Ready to Transform Your Legal Workflow?
+              Unlock the Truth in Your Ancient Deeds & Court Records
             </h2>
             <p className="text-lg text-white/90">
-              Join legal professionals across India using AI to process documents faster and smarter
+              Join citizens, legal practitioners, and archivists across India using VidhiChakshu to decode legal history.
             </p>
             <Link to="/auth">
               <Button size="lg" className="bg-legal-gold hover:bg-legal-gold/90 text-legal-navy font-semibold">
-                Start Processing Documents
+                Launch VidhiChakshu Workspace
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>
@@ -147,14 +148,8 @@ const Index = () => {
 
       {/* Footer */}
       <footer className="border-t py-12 bg-muted/30">
-        <div className="container mx-auto px-4 text-center">
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Scale className="h-6 w-6 text-legal-gold" />
-            <span className="text-lg font-bold">Dharma Lens</span>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            © 2026 Dharma Lens Platform. All rights reserved. | Built for Indian Legal Professionals
-          </p>
+        <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
+          <p>© 2026 VidhiChakshu (विधि-चक्षु). All rights reserved. Indian Legal & Heritage Document Intelligence.</p>
         </div>
       </footer>
     </div>

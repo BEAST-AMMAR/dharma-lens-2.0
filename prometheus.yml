@@ -1,0 +1,12 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'nyayasetu-node-gateway'
+    static_configs:
+      - targets: ['node_gateway:3000']
+
+  - job_name: 'nyayasetu-python-engine'
+    static_configs:
+      - targets: ['python_engine:8000']

@@ -1,45 +1,222 @@
-name: Dharma Lens 2.0 CI
+name: VidhiChakshu CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main", "dev"]
+
+env:
+  REGISTRY: docker.io
+  IMAGE_PREFIX: beast2711/vidhichakshu
 
 jobs:
-  node-gateway-tests:
+  # ────────────────────────────────────────
+  # Frontend: Lint & Build
+  # ────────────────────────────────────────
+  frontend-lint-build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20.x'
-    - name: Install dependencies
-      working-directory: ./node_backend
-      run: npm install
-    - name: Run tests
-      working-directory: ./node_backend
-      run: npm test || echo "No tests configured yet"
+      - uses: actions/checkout@v4
 
-  python-ml-tests:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 1
+
+  # ────────────────────────────────────────
+  # Node Backend: Lint & Test
+  # ────────────────────────────────────────
+  node-gateway-lint-test:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-    - name: Install dependencies
-      working-directory: ./python_backend
-      run: |
-        python -m pip install --upgrade pip
-        pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
-      working-directory: ./python_backend
-      run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-    - name: Test with pytest
-      working-directory: ./python_backend
-      run: pytest || echo "No tests configured yet"
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20.x"
+          cache: "npm"
+          cache-dependency-path: node_backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./node_backend
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: ./node_backend
+        run: npm run lint || echo "No linting configured"
+
+      - name: Run tests
+        working-directory: ./node_backend
+        run: npm test || echo "No tests configured yet"
+
+  # ────────────────────────────────────────
+  # Python Backend: Lint & Test
+  # ────────────────────────────────────────
+  python-ml-lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        working-directory: ./python_backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 pytest pylint
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint with flake8
+        working-directory: ./python_backend
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+      - name: Run pytest
+        working-directory: ./python_backend
+        run: pytest -v || echo "No tests configured yet"
+
+  # ────────────────────────────────────────
+  # Docker: Build & Push Images
+  # ────────────────────────────────────────
+  docker-build-push:
+    runs-on: ubuntu-latest
+    needs: [frontend-lint-build, node-gateway-lint-test, python-ml-lint-test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}
+
+      - name: Extract metadata - Frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-frontend
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata - Node Gateway
+        id: meta-node
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-node
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Node Gateway
+        uses: docker/build-push-action@v5
+        with:
+          context: ./node_backend
+          file: ./node_backend/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta-node.outputs.tags }}
+          labels: ${{ steps.meta-node.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Extract metadata - Python Engine
+        id: meta-python
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-python
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Python Engine
+        uses: docker/build-push-action@v5
+        with:
+          context: ./python_backend
+          file: ./python_backend/Dockerfile
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta-python.outputs.tags }}
+          labels: ${{ steps.meta-python.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ────────────────────────────────────────
+  # Docker Compose Validation
+  # ────────────────────────────────────────
+  docker-compose-validate:
+    runs-on: ubuntu-latest
+    needs: [frontend-lint-build, node-gateway-lint-test, python-ml-lint-test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+
+      - name: Validate docker-compose syntax
+        run: docker compose config > /dev/null
+
+      - name: Create .env for validation
+        run: |
+          echo "VITE_SUPABASE_URL=https://test.supabase.co" >> .env
+          echo "VITE_SUPABASE_ANON_KEY=test-key" >> .env
+          echo "OPENROUTER_API_KEY=test-key" >> .env
+
+      - name: Build images with docker compose
+        run: docker compose build --no-cache
+        timeout-minutes: 30

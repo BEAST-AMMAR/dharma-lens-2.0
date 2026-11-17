@@ -1,0 +1,196 @@
+version: '3.8'
+
+services:
+  # ═══════════════════════════════════════════
+  # FRONTEND - React + Nginx
+  # ═══════════════════════════════════════════
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+    image: beast2711/vidhichakshu-frontend:latest
+    container_name: vidhichakshu-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      node_gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - vidhichakshu-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ═══════════════════════════════════════════
+  # NODE GATEWAY - Express API
+  # ═══════════════════════════════════════════
+  node_gateway:
+    build:
+      context: ./node_backend
+      dockerfile: Dockerfile
+    image: beast2711/vidhichakshu-node:latest
+    container_name: vidhichakshu-node
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PYTHON_ENGINE_URL=http://python_engine:8000/process
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - DATABASE_URL=postgresql://admin:${DB_PASSWORD}@database:5432/vidhichakshu
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - .env
+    depends_on:
+      python_engine:
+        condition: service_healthy
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - vidhichakshu-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ═══════════════════════════════════════════
+  # PYTHON ENGINE - FastAPI ML Processing
+  # ═══════════════════════════════════════════
+  python_engine:
+    build:
+      context: ./python_backend
+      dockerfile: Dockerfile
+    image: beast2711/vidhichakshu-python:latest
+    container_name: vidhichakshu-python
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - DATABASE_URL=postgresql://admin:${DB_PASSWORD}@database:5432/vidhichakshu
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - vidhichakshu-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - ml_cache:/app/models
+
+  # ═══════════════════════════════════════════
+  # DATABASE - PostgreSQL
+  # ═══════════════════════════════════════════
+  database:
+    image: postgres:15-alpine
+    container_name: vidhichakshu-db
+    environment:
+      POSTGRES_DB: vidhichakshu
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - vidhichakshu-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d vidhichakshu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ═══════════════════════════════════════════
+  # REDIS - Caching Layer
+  # ═══════════════════════════════════════════
+  redis:
+    image: redis:7-alpine
+    container_name: vidhichakshu-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - vidhichakshu-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ═══════════════════════════════════════════
+  # PROMETHEUS - Metrics Collection
+  # ═══════════════════════════════════════════
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vidhichakshu-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    networks:
+      - vidhichakshu-network
+    restart: unless-stopped
+
+  # ═══════════════════════════════════════════
+  # GRAFANA - Visualization & Dashboards
+  # ═══════════════════════════════════════════
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vidhichakshu-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: admin
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - vidhichakshu-network
+    restart: unless-stopped
+
+networks:
+  vidhichakshu-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  ml_cache:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local

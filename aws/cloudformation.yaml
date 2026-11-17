@@ -1,0 +1,307 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'VidhiChakshu 3.0 - AI Vision for Indian Legal & Heritage Documents Stack on AWS'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [development, staging, production]
+    Description: Environment name
+  
+  InstanceType:
+    Type: String
+    Default: t3.medium
+    AllowedValues: [t3.small, t3.medium, t3.large, t3.xlarge]
+    Description: EC2 instance type
+  
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 KeyPair for SSH access
+  
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: Database password
+    MinLength: 8
+
+Resources:
+  # ============================================================
+  # VPC & NETWORKING
+  # ============================================================
+  DharmaLensVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'dharma-lens-${Environment}'
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DharmaLensVPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: true
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DharmaLensVPC
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [0, !GetAZs '']
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DharmaLensVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DharmaLensVPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  # ============================================================
+  # SECURITY GROUPS
+  # ============================================================
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for Dharma Lens application
+      VpcId: !Ref DharmaLensVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 3001
+          ToPort: 3001
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 9090
+          ToPort: 9090
+          CidrIp: 0.0.0.0/0
+
+  DBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS database
+      VpcId: !Ref DharmaLensVPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+
+  # ============================================================
+  # EC2 INSTANCE
+  # ============================================================
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly'
+        - 'arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy'
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  DharmaLensEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub 'resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SubnetId: !Ref PublicSubnet
+      SecurityGroupIds:
+        - !Ref AppSecurityGroup
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+          
+          # Update system
+          yum update -y
+          yum install -y docker git
+          
+          # Start Docker
+          systemctl start docker
+          systemctl enable docker
+          
+          # Install Docker Compose
+          curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          chmod +x /usr/local/bin/docker-compose
+          
+          # Clone repository
+          cd /opt
+          git clone https://github.com/beast2711/dharma-lens.git
+          cd dharma-lens
+          
+          # Create .env file
+          cat > .env << 'EOF'
+          VITE_SUPABASE_URL="${VITE_SUPABASE_URL}"
+          VITE_SUPABASE_ANON_KEY="${VITE_SUPABASE_ANON_KEY}"
+          OPENROUTER_API_KEY="${OPENROUTER_API_KEY}"
+          DB_PASSWORD=${DBPassword}
+          GRAFANA_PASSWORD=${DBPassword}
+          EOF
+          
+          # Start services
+          docker-compose -f docker-compose.yml -f docker-compose.extended.yml up -d
+      Tags:
+        - Key: Name
+          Value: !Sub 'dharma-lens-${Environment}'
+
+  # ============================================================
+  # RDS DATABASE
+  # ============================================================
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for Dharma Lens RDS
+      SubnetIds:
+        - !Ref PublicSubnet
+        - !Ref PrivateSubnet
+
+  DharmaLensDB:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    Properties:
+      DBInstanceClass: db.t3.micro
+      Engine: postgres
+      EngineVersion: '15.0'
+      MasterUsername: admin
+      MasterUserPassword: !Ref DBPassword
+      DBName: dharma_lens
+      AllocatedStorage: 20
+      StorageType: gp2
+      VPCSecurityGroups:
+        - !Ref DBSecurityGroup
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      MultiAZ: false
+      BackupRetentionPeriod: 30
+      PreferredBackupWindow: '03:00-04:00'
+      PreferredMaintenanceWindow: 'sun:04:00-sun:05:00'
+      EnableCloudwatchLogsExports:
+        - postgresql
+      Tags:
+        - Key: Name
+          Value: !Sub 'dharma-lens-db-${Environment}'
+
+  # ============================================================
+  # ELASTICACHE REDIS
+  # ============================================================
+  RedisSubnetGroup:
+    Type: AWS::ElastiCache::SubnetGroup
+    Properties:
+      Description: Subnet group for Dharma Lens Redis
+      SubnetIds:
+        - !Ref PublicSubnet
+        - !Ref PrivateSubnet
+
+  DharmaLensRedis:
+    Type: AWS::ElastiCache::CacheCluster
+    Properties:
+      CacheNodeType: cache.t3.micro
+      Engine: redis
+      EngineVersion: '7.0'
+      NumCacheNodes: 1
+      Port: 6379
+      VpcSecurityGroupIds:
+        - !Ref AppSecurityGroup
+      CacheSubnetGroupName: !Ref RedisSubnetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub 'dharma-lens-redis-${Environment}'
+
+  # ============================================================
+  # LOAD BALANCER
+  # ============================================================
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub 'dharma-lens-${Environment}'
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - !Ref PublicSubnet
+        - !Ref PrivateSubnet
+      SecurityGroups:
+        - !Ref AppSecurityGroup
+
+Outputs:
+  ApplicationURL:
+    Description: URL to access Dharma Lens
+    Value: !Sub 'http://${DharmaLensEC2.PublicIp}:8080'
+  
+  APIGatewayURL:
+    Description: URL to API Gateway
+    Value: !Sub 'http://${DharmaLensEC2.PublicIp}:3000'
+  
+  GrafanaURL:
+    Description: URL to Grafana Dashboard
+    Value: !Sub 'http://${DharmaLensEC2.PublicIp}:3001'
+  
+  DatabaseEndpoint:
+    Description: RDS Database Endpoint
+    Value: !GetAtt DharmaLensDB.Endpoint.Address
+  
+  RedisEndpoint:
+    Description: ElastiCache Redis Endpoint
+    Value: !GetAtt DharmaLensRedis.RedisEndpoint.Address
+  
+  EC2InstanceIP:
+    Description: EC2 Instance Public IP
+    Value: !GetAtt DharmaLensEC2.PublicIp

@@ -28,7 +28,7 @@ const Auth = () => {
 
       if (error) throw error;
 
-      toast({ title: "Login successful!", description: "Welcome back to LegalAI" });
+      toast({ title: "Login successful!", description: "Welcome back to VidhiChakshu" });
       navigate("/dashboard");
     } catch (error: any) {
       toast({
@@ -46,7 +46,6 @@ const Auth = () => {
     setIsLoading(true);
 
     try {
-      // Basic password strength check
       if (signupData.password.length < 8 || !/\d/.test(signupData.password) || !/[a-zA-Z]/.test(signupData.password)) {
         throw new Error("Password must be at least 8 characters long and contain both letters and numbers.");
       }
@@ -65,7 +64,7 @@ const Auth = () => {
       if (data?.session) {
         toast({
           title: "Account created!",
-          description: "Welcome to LegalAI Platform.",
+          description: "Welcome to VidhiChakshu Platform.",
         });
         navigate("/dashboard");
       } else {
@@ -73,7 +72,6 @@ const Auth = () => {
           title: "Verify your email",
           description: "We've sent a confirmation link to your email. Please verify before logging in.",
         });
-        // Clear password and stay on /auth
         setSignupData({ ...signupData, password: "" });
       }
     } catch (error: any) {
@@ -96,8 +94,8 @@ const Auth = () => {
               <Scale className="h-8 w-8 text-legal-gold" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Dharma Lens</CardTitle>
-          <CardDescription>Indian Legal Document AI Processing</CardDescription>
+          <CardTitle className="text-2xl font-bold">VidhiChakshu (विधि-चक्षु)</CardTitle>
+          <CardDescription>The AI Vision for Indian Legal & Heritage Documents</CardDescription>
         </CardHeader>
 
         <Tabs defaultValue="login" className="w-full">

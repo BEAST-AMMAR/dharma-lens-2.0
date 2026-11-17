@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Scale, Upload, FileText, Languages, Mic, Brain, LogOut, User, History, Clock } from "lucide-react";
+import { Scale, Upload, FileText, Languages, Mic, Brain, LogOut, User, History, Clock, Scroll, BookOpen, Users, Shield } from "lucide-react";
 import { Session } from "@supabase/supabase-js";
 import DocumentUpload from "@/components/DocumentUpload";
 import ProcessingConfig from "@/components/ProcessingConfig";
@@ -20,12 +20,16 @@ const Dashboard = () => {
   const [history, setHistory] = useState<any[]>([]);
 
   const fetchHistory = async () => {
-    const { data, error } = await supabase
-      .from("processing_results")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (data && !error) {
-      setHistory(data);
+    try {
+      const { data, error } = await supabase
+        .from("processing_results")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (data && !error) {
+        setHistory(data);
+      }
+    } catch (err) {
+      console.error("Failed to load document history", err);
     }
   };
 
@@ -56,6 +60,32 @@ const Dashboard = () => {
     navigate("/");
   };
 
+  const handleSelectHistoryItem = (item: any) => {
+    const meta = item.metadata || {};
+    const normalized = {
+      text: item.extracted_text || item.text,
+      extracted_text: item.extracted_text || item.text,
+      redacted_text: meta.redacted_text || item.extracted_text || item.text,
+      summary: item.summary,
+      layman_summary: meta.layman_summary,
+      archaic_terms: meta.archaic_terms || [],
+      chauhaddi: meta.chauhaddi || {},
+      lineage: meta.lineage || {},
+      title_chain: meta.title_chain || [],
+      title_health_score: meta.title_health_score !== undefined ? meta.title_health_score : 85,
+      title_defects: meta.title_defects || [],
+      translation: item.translation,
+      entities: item.entities,
+      legalAnalysis: item.legal_analysis,
+      legal_analysis: item.legal_analysis,
+      htrMetadata: meta.htrMetadata,
+      audio_transcription: item.audio_transcription,
+      document_id: item.document_id
+    };
+    setProcessingResult(normalized);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -65,10 +95,10 @@ const Dashboard = () => {
   }
 
   const features = [
-    { icon: FileText, title: "OCR Processing", desc: "Extract text from legal documents" },
-    { icon: Brain, title: "AI Summarization", desc: "Generate concise summaries" },
-    { icon: Languages, title: "Translation", desc: "22+ Indian languages supported" },
-    { icon: Mic, title: "Audio Transcription", desc: "Court proceedings & hearings" },
+    { icon: Scroll, title: "Heritage Scripts (HTR)", desc: "Modi, Halegannada & Nastaliq transliteration" },
+    { icon: Users, title: "Citizen Layman Summary", desc: "Everyday explanations for citizens & farmers" },
+    { icon: BookOpen, title: "Archaic Revenue Lexicon", desc: "Detects Khasra, Bainama, Watandar & Sanad" },
+    { icon: Shield, title: "BNS & Land Law Engine", desc: "Statutory transitions & property checks" },
   ];
 
   return (
@@ -81,8 +111,8 @@ const Dashboard = () => {
               <Scale className="h-6 w-6 text-legal-gold" />
             </div>
             <div>
-              <h1 className="text-xl font-bold">Dharma Lens</h1>
-              <p className="text-sm text-muted-foreground">Document Processing Dashboard</p>
+              <h1 className="text-xl font-bold">VidhiChakshu (विधि-चक्षु)</h1>
+              <p className="text-sm text-muted-foreground">The AI Vision for Indian Legal & Heritage Documents</p>
             </div>
           </div>
           
@@ -124,33 +154,39 @@ const Dashboard = () => {
                 <History className="h-5 w-5 text-legal-gold" />
                 My Documents History
               </CardTitle>
-              <CardDescription>Previously processed documents</CardDescription>
+              <CardDescription>Previously processed documents and heritage deeds (Saved in your secure account)</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {history.map((item) => (
-                  <Card 
-                    key={item.id} 
-                    className="p-4 cursor-pointer hover:border-legal-gold transition-colors"
-                    onClick={() => {
-                      setProcessingResult(item.result || item);
-                      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-                    }}
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <p className="text-sm font-medium truncate" title={item.document_path || `Document ${item.id.substring(0,6)}`}>
-                          {item.document_path ? item.document_path.split('/').pop() : `Document ${item.id.substring(0,6)}`}
-                        </p>
+                {history.map((item) => {
+                  const docTitle = item.document_id ? item.document_id.split('/').pop() : `Document ${item.id.substring(0,6)}`;
+                  const scriptType = item.metadata?.htrMetadata?.script_type;
+                  return (
+                    <Card 
+                      key={item.id} 
+                      className="p-4 cursor-pointer hover:border-legal-gold transition-colors"
+                      onClick={() => handleSelectHistoryItem(item)}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2 mb-2 min-w-0">
+                          <FileText className="h-4 w-4 text-legal-gold shrink-0" />
+                          <p className="text-sm font-medium truncate" title={docTitle}>
+                            {docTitle}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Clock className="h-3 w-3" />
-                      {new Date(item.created_at).toLocaleDateString()}
-                    </div>
-                  </Card>
-                ))}
+                      {scriptType && (
+                        <p className="text-xs text-primary font-semibold mb-2 truncate">
+                          📜 {scriptType}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Clock className="h-3 w-3" />
+                        {new Date(item.created_at).toLocaleDateString()} at {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -161,10 +197,10 @@ const Dashboard = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="h-5 w-5 text-legal-gold" />
-              Upload Documents
+              Upload Documents & Heritage Deeds
             </CardTitle>
             <CardDescription>
-              Upload legal documents for AI processing (PDF, Images, Audio files)
+              Upload legal documents, century-old property deeds, handwritten manuscripts, or court audio recordings
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -175,15 +211,18 @@ const Dashboard = () => {
         {/* Processing Configuration */}
         <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle>Processing Configuration</CardTitle>
+            <CardTitle>Processing & Paleography Configuration</CardTitle>
             <CardDescription>
-              Configure AI processing options for your documents
+              Configure AI vision, script recognition, layman explanation, and statutory analysis options
             </CardDescription>
           </CardHeader>
           <CardContent>
             <ProcessingConfig 
               documentPath={currentDocumentPath}
-              onProcessingComplete={setProcessingResult}
+              onProcessingComplete={(res) => {
+                setProcessingResult(res);
+                fetchHistory(); // Automatically reload history so the card appears immediately!
+              }}
             />
           </CardContent>
         </Card>
@@ -192,9 +231,9 @@ const Dashboard = () => {
         {processingResult && (
           <Card className="shadow-lg">
             <CardHeader>
-              <CardTitle>Processing Results</CardTitle>
+              <CardTitle>Processing & Paleographic Analysis Results</CardTitle>
               <CardDescription>
-                AI-generated analysis and extracted information
+                AI-generated transcription, layman summary, archaic revenue terms, and statutory legal intelligence
               </CardDescription>
             </CardHeader>
             <CardContent>

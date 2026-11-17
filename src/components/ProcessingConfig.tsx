@@ -175,7 +175,7 @@ const ProcessingConfig = ({ documentPath, onProcessingComplete }: ProcessingConf
       {/* Model Mode Selection (Hybrid / Local / Cloud) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="processingMode" className="font-semibold text-legal-gold">AI Execution Engine</Label>
+          <Label htmlFor="processingMode" className="font-semibold text-legal-gold">VidhiChakshu AI Execution Engine</Label>
           <Select
             value={config.processingMode}
             onValueChange={(value) => setConfig({ ...config, processingMode: value })}
@@ -185,8 +185,8 @@ const ProcessingConfig = ({ documentPath, onProcessingComplete }: ProcessingConf
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="hybrid">⚡ Hybrid Mode (Local Ollama + Auto Cloud Failover)</SelectItem>
-              <SelectItem value="local">🔒 Local Offline Mode (Ollama Qwen2.5-7B)</SelectItem>
-              <SelectItem value="cloud">☁️ Cloud Mode (OpenRouter / Gemini Pro / Llama 3.1)</SelectItem>
+              <SelectItem value="local">🔒 Local Offline Mode (Ollama Qwen2.5-7B / Air-Gapped)</SelectItem>
+              <SelectItem value="cloud">☁️ Cloud Mode (Multi-Modal Vision & OpenRouter)</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -238,10 +238,10 @@ const ProcessingConfig = ({ documentPath, onProcessingComplete }: ProcessingConf
                 <SelectValue placeholder="Select script" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="auto">Auto Detect Script</SelectItem>
-                <SelectItem value="modi">Modi Script (Maharashtra 17th-20th c. Land Deeds - MoScNet)</SelectItem>
-                <SelectItem value="halegannada">Halegannada (Old Kannada Historical Grants - Lipi Gnani)</SelectItem>
-                <SelectItem value="perso-arabic">Perso-Arabic (Urdu/Persian Nastaliq Revenue Records - Kraken)</SelectItem>
+                <SelectItem value="auto">Auto Detect Historical Script</SelectItem>
+                <SelectItem value="modi">Modi Script (Maharashtra 17th–20th c. Land Deeds - Paleography VLM)</SelectItem>
+                <SelectItem value="halegannada">Halegannada (Old Kannada Historical Grants - Epigraphy VLM)</SelectItem>
+                <SelectItem value="perso-arabic">Perso-Arabic (Urdu/Persian Nastaliq Revenue Records - Paleography VLM)</SelectItem>
               </SelectContent>
             </Select>
           </div>

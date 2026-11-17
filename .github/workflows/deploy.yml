@@ -1,0 +1,43 @@
+name: Deploy
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/deploy.yml"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "node_backend/**"
+      - "python_backend/**"
+      - "src/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pull latest images from Docker Hub
+        run: |
+          docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/vidhichakshu-frontend:latest
+          docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/vidhichakshu-node:latest
+          docker pull ${{ secrets.DOCKER_HUB_USERNAME }}/vidhichakshu-python:latest
+
+      - name: Deploy with docker compose
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OLLAMA_BASE_URL: ${{ secrets.OLLAMA_BASE_URL }}
+        run: |
+          docker compose down || true
+          docker compose up -d
+          docker compose logs
+
+      - name: Health check
+        run: |
+          sleep 5
+          curl -f http://localhost:3000/health || exit 1
+          curl -f http://localhost:8000/health || exit 1
+          echo "All services are healthy"

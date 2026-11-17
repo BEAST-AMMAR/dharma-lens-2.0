@@ -5,35 +5,79 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: beast2711/dharma-lens-frontend:latest
+      args:
+        - NODE_ENV=production
+    image: beast2711/vidhichakshu-frontend:latest
+    container_name: vidhichakshu-frontend
     ports:
       - "8080:80"
     depends_on:
-      - node_gateway
+      node_gateway:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - vidhichakshu-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/index.html"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   node_gateway:
     build:
       context: ./node_backend
       dockerfile: Dockerfile
-    image: beast2711/dharma-lens-node:latest
+    image: beast2711/vidhichakshu-node:latest
+    container_name: vidhichakshu-node
     ports:
       - "3000:3000"
     environment:
+      - NODE_ENV=production
       - PYTHON_ENGINE_URL=http://python_engine:8000/process
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+    env_file:
+      - .env
     depends_on:
-      - python_engine
+      python_engine:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - vidhichakshu-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   python_engine:
     build:
       context: ./python_backend
       dockerfile: Dockerfile
-    image: beast2711/dharma-lens-python:latest
+    image: beast2711/vidhichakshu-python:latest
+    container_name: vidhichakshu-python
     ports:
       - "8000:8000"
     environment:
+      - PYTHONUNBUFFERED=1
       - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
       - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+    env_file:
+      - .env
+    restart: unless-stopped
+    networks:
+      - vidhichakshu-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  vidhichakshu-network:
+    driver: bridge

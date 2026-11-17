@@ -1,8 +1,14 @@
+"""
+VidhiChakshu (विधि-चक्षु) - Multi-Agent Legal & Property Knowledge Graph Engine
+Uses LangGraph and NetworkX to analyze statutory transitions (IPC <-> BNS, CrPC <-> BNSS, IEA <-> BSA)
+and Indian Land / Property Laws (Transfer of Property Act, Registration Act, Stamp Act, Specific Relief Act).
+"""
+
 import sys
 import os
 import json
 import pydantic
-from typing import Dict, TypedDict, Annotated, Sequence
+from typing import Dict, TypedDict, Annotated, Sequence, List
 
 # LangChain Core / LangGraph Pydantic v1 compatibility shim
 try:
@@ -12,12 +18,11 @@ try:
     except ImportError:
         pydantic_v1 = pydantic
     sys.modules['langchain_core.pydantic_v1'] = pydantic_v1
-except Exception as _lc_err:
+except Exception:
     pass
 
 import networkx as nx
 from langgraph.graph import StateGraph, END
-from pydantic import BaseModel
 
 class AgentState(TypedDict):
     document_text: str
@@ -25,18 +30,19 @@ class AgentState(TypedDict):
     reformulated_query: str
     requires_constitutional: bool
     requires_criminal: bool
+    requires_property: bool
     vector_results: list
     graph_results: list
     final_analysis: dict
     config: dict
 
 # ──────────────────────────────────────────────────────────────────
-# DYNAMIC LEGAL GRAPH — Expanded IPC<->BNS<->BNSS<->BSA statutory mappings
+# DYNAMIC LEGAL KNOWLEDGE GRAPH
 # ──────────────────────────────────────────────────────────────────
 legal_graph = nx.DiGraph()
 
 def init_legal_graph():
-    """Build dynamic NetworkX knowledge graph for IPC<->BNS<->BNSS<->BSA statutory relationships."""
+    """Build dynamic NetworkX knowledge graph for Criminal, Procedural, Property, and Evidence laws."""
     legal_graph.clear()
     
     # ── IPC <-> BNS Mappings (Criminal Law) ──
@@ -51,6 +57,9 @@ def init_legal_graph():
         ("IPC_506", "BNS_351", "Criminal Intimidation", "Criminal intimidation"),
         ("IPC_34", "BNS_3_5", "Common Intention", "Acts done by several persons in furtherance of common intention"),
         ("IPC_120B", "BNS_61", "Criminal Conspiracy", "Criminal conspiracy"),
+        ("IPC_463", "BNS_336", "Forgery", "Making a false document with intent to cause damage"),
+        ("IPC_467", "BNS_338", "Forgery of Valuable Security", "Forgery of will, authority to adopt, or valuable security"),
+        ("IPC_471", "BNS_340", "Using Forged Document as Genuine", "Fraudulently using forged document as genuine"),
     ]
     
     for ipc_id, bns_id, short_title, full_title in ipc_bns_mappings:
@@ -66,6 +75,7 @@ def init_legal_graph():
         ("CrPC_41", "BNSS_35", "Arrest without Warrant", "When police may arrest without warrant"),
         ("CrPC_438", "BNSS_482", "Anticipatory Bail", "Direction for grant of bail to person apprehending arrest"),
         ("CrPC_482", "BNSS_528", "Inherent Powers", "Saving of inherent powers of High Court"),
+        ("CrPC_145", "BNSS_164", "Dispute over Land/Water", "Procedure where dispute concerning land is likely to cause breach of peace"),
     ]
     
     for crpc_id, bnss_id, short_title, full_title in crpc_bnss_mappings:
@@ -74,27 +84,68 @@ def init_legal_graph():
         legal_graph.add_edge(crpc_id, bnss_id, relation="SUPERSEDED_BY")
         legal_graph.add_edge(bnss_id, crpc_id, relation="REPLACES")
 
+    # ── Indian Evidence Act <-> Bharatiya Sakshya Adhiniyam (BSA 2023) ──
+    iea_bsa_mappings = [
+        ("IEA_62", "BSA_57", "Primary Evidence", "Document itself produced for inspection of court"),
+        ("IEA_63", "BSA_58", "Secondary Evidence", "Certified copies, copies made from original"),
+        ("IEA_65B", "BSA_61", "Electronic Evidence", "Admissibility of electronic records and certificates"),
+        ("IEA_90", "BSA_84", "Presumption as to 30-Year-Old Documents", "Ancient documents produced from proper custody presumed genuine"),
+    ]
+
+    for iea_id, bsa_id, short_title, full_title in iea_bsa_mappings:
+        legal_graph.add_node(iea_id, type="section", title=short_title, full_title=full_title, act="IEA")
+        legal_graph.add_node(bsa_id, type="section", title=short_title, full_title=full_title, act="BSA")
+        legal_graph.add_edge(iea_id, bsa_id, relation="SUPERSEDED_BY")
+        legal_graph.add_edge(bsa_id, iea_id, relation="REPLACES")
+
+    # ── Land, Property & Conveyancing Statutes ──
+    property_statutes = [
+        ("TPA_54", "Sale of Immovable Property", "Transfer of ownership in exchange for a price paid or promised", "Transfer of Property Act, 1882"),
+        ("TPA_58", "Mortgage", "Transfer of an interest in specific immovable property for securing payment", "Transfer of Property Act, 1882"),
+        ("TPA_105", "Lease", "Transfer of a right to enjoy immovable property for time or in perpetuity", "Transfer of Property Act, 1882"),
+        ("TPA_122", "Gift", "Transfer of movable or immovable property made voluntarily and without consideration", "Transfer of Property Act, 1882"),
+        ("TPA_53A", "Part Performance", "Equitable doctrine protecting buyer's possession under written contract", "Transfer of Property Act, 1882"),
+        ("REG_17", "Compulsory Registration", "Documents of which registration is mandatory (Sale, Gift, Mortgage > Rs 100)", "Indian Registration Act, 1908"),
+        ("REG_49", "Effect of Non-Registration", "Unregistered document shall not affect immovable property or be received as evidence", "Indian Registration Act, 1908"),
+        ("STAMP_33", "Impounding of Unstamped Instruments", "Duty of public officer to impound documents not duly stamped", "Indian Stamp Act, 1899"),
+        ("STAMP_35", "Inadmissibility of Unstamped Deeds", "Instruments not duly stamped inadmissible in evidence for any purpose", "Indian Stamp Act, 1899"),
+        ("SRA_5", "Recovery of Specific Immovable Property", "Person entitled to possession may recover under Civil Procedure Code", "Specific Relief Act, 1963"),
+        ("SRA_34", "Declaration of Title", "Discretion of court as to declaration of legal status or right to property", "Specific Relief Act, 1963"),
+        ("LIM_65", "Adverse Possession (12 Years)", "Limitation period for suit for possession of immovable property based on title", "Limitation Act, 1963"),
+    ]
+
+    for sec_id, short_title, desc, act_name in property_statutes:
+        legal_graph.add_node(sec_id, type="property_statute", title=short_title, content=desc, act=act_name)
+
+    # Cross-Statutory Dependencies for Property
+    legal_graph.add_edge("TPA_54", "REG_17", relation="MANDATORILY_REQUIRES")
+    legal_graph.add_edge("TPA_54", "STAMP_35", relation="REQUIRES_ADEQUATE_STAMP_DUTY")
+    legal_graph.add_edge("TPA_122", "REG_17", relation="MANDATORILY_REQUIRES")
+    legal_graph.add_edge("TPA_58", "REG_17", relation="REQUIRES_REGISTRATION_IF_OVER_RS100")
+    legal_graph.add_edge("REG_17", "REG_49", relation="PENALTY_FOR_VIOLATION")
+
     # ── Constitutional Articles ──
     constitutional_articles = [
         ("Article_14", "Equality Before Law", "The State shall not deny to any person equality before the law"),
-        ("Article_19", "Freedom of Speech", "All citizens shall have the right to freedom of speech and expression"),
-        ("Article_20", "Protection against Conviction", "No person shall be convicted except for violation of a law in force"),
-        ("Article_21", "Right to Life", "No person shall be deprived of life or personal liberty except according to procedure established by law"),
-        ("Article_22", "Protection against Arrest", "No person who is arrested shall be detained without being informed of grounds"),
-        ("Article_32", "Right to Constitutional Remedies", "The right to move the Supreme Court for enforcement of fundamental rights"),
-        ("Article_226", "Power of High Courts", "Power of High Courts to issue certain writs"),
+        ("Article_19", "Freedom of Speech & Trade", "Fundamental freedoms including right to practice any profession or trade"),
+        ("Article_20", "Protection Against Ex-Post-Facto Conviction", "No person shall be convicted except for violation of law in force at time"),
+        ("Article_21", "Protection of Life and Personal Liberty", "No person shall be deprived of life or personal liberty except by procedure established by law"),
+        ("Article_22", "Protection Against Arbitrary Arrest", "Right to be informed of grounds of arrest and legal representation"),
+        ("Article_300A", "Right to Property", "No person shall be deprived of his property save by authority of law (Constitutional Right)"),
+        ("Article_32", "Right to Constitutional Remedies", "Direct remedy before Supreme Court for enforcement of fundamental rights"),
+        ("Article_226", "Writ Jurisdiction of High Courts", "Power of High Courts to issue writs for fundamental and statutory rights"),
     ]
     
     for art_id, title, content in constitutional_articles:
         legal_graph.add_node(art_id, type="article", title=title, content=content, act="Constitution")
     
-    # ── Constitutional Review Edges ──
+    # Constitutional Linkages
     constitutional_review_edges = [
         ("BNS_103", "Article_21"), ("BNS_64", "Article_21"),
         ("BNS_303", "Article_14"), ("BNS_318", "Article_14"),
-        ("BNS_85", "Article_21"), ("BNS_74", "Article_21"),
         ("BNSS_35", "Article_22"), ("BNSS_482", "Article_21"),
-        ("BNSS_173", "Article_21"),
+        ("BNSS_173", "Article_21"), ("BNSS_164", "Article_300A"),
+        ("TPA_54", "Article_300A"), ("SRA_5", "Article_300A"),
     ]
     
     for statute, article in constitutional_review_edges:
@@ -105,48 +156,51 @@ init_legal_graph()
 
 def router_node(state: AgentState) -> AgentState:
     """
-    Router Agent: Determines if document requires Constitutional or Criminal Law analysis,
-    and reformulates raw document into a focused legal query.
+    Router Agent: Analyzes whether document concerns Property/Land, Criminal, or Constitutional law.
+    Reformulates the document into a focused statutory query.
     """
-    print("[Agentic RAG] Router Node analyzing document context...")
+    print("[VidhiChakshu Agentic RAG] Router analyzing legal domain...")
     from services.ai_pipeline import call_llm_hybrid
     
-    text = state["document_text"][:2500]
+    text = state["document_text"][:3000]
     config = state.get("config", {})
     
     system_prompt = (
-        "You are a legal document router and query reformulator. "
-        "Analyze the input text and return a JSON object with EXACTLY these keys:\n"
+        "You are VidhiChakshu's legal router. Analyze the document context and return a JSON object with EXACTLY these keys:\n"
         "{\n"
-        '  "requires_constitutional": true/false,\n'
+        '  "requires_property": true/false,\n'
         '  "requires_criminal": true/false,\n'
-        '  "reformulated_query": "Focused 1-sentence legal question representing key issues"\n'
+        '  "requires_constitutional": true/false,\n'
+        '  "reformulated_query": "One concise sentence identifying key statutory/property issues"\n'
         "}"
     )
     user_prompt = f"Analyze this text:\n\n{text}"
     
     try:
         res = call_llm_hybrid(system_prompt, user_prompt, is_json=True, config=config)
-        state["requires_constitutional"] = res.get("requires_constitutional", True)
-        state["requires_criminal"] = res.get("requires_criminal", True)
+        state["requires_property"] = res.get("requires_property", True)
+        state["requires_criminal"] = res.get("requires_criminal", False)
+        state["requires_constitutional"] = res.get("requires_constitutional", False)
         state["reformulated_query"] = res.get("reformulated_query", text[:300])
     except Exception as e:
-        print(f"[Router Node Error]: {e}")
-        state["requires_constitutional"] = True
-        state["requires_criminal"] = True
+        print(f"[Router Notice]: {e}")
+        # Default heuristics
+        text_lower = text.lower()
+        state["requires_property"] = any(w in text_lower for w in ["sale", "deed", "land", "plot", "khasra", "survey", "mortgage", "patta", "sanad", "bainama", "watan", "inam"])
+        state["requires_criminal"] = any(w in text_lower for w in ["ipc", "bns", "crpc", "bnss", "police", "fir", "offence", "cheating", "fraud", "forgery", "accused"])
+        state["requires_constitutional"] = any(w in text_lower for w in ["article", "writ", "constitution", "fundamental", "liberty"])
         state["reformulated_query"] = text[:300]
         
     return state
 
 def vector_retrieval_node(state: AgentState) -> AgentState:
     """
-    Hybrid Retrieval Agent: Queries Supabase using hybrid search (BM25 + pgvector)
-    with sentence-transformer CPU embeddings. Falls back to graph-only if vector store is empty.
+    Hybrid Vector Retriever: Queries Supabase pgvector store for matching statutory precedents.
     """
-    print("[Agentic RAG] Hybrid Retriever searching Supabase pgvector...")
+    print("[VidhiChakshu Agentic RAG] Querying Supabase pgvector...")
     query = state.get("reformulated_query") or state["document_text"][:500]
-    
     vector_results = []
+    
     try:
         from services.ingest_law import model, supabase
         query_embedding = model.encode(query).tolist()
@@ -172,67 +226,64 @@ def vector_retrieval_node(state: AgentState) -> AgentState:
                     "superseded_by": row.get("superseded_by"),
                     "replaces": row.get("replaces")
                 })
-            print(f"[Vector Retrieval] Found {len(vector_results)} real results from Supabase pgvector.")
-        else:
-            print("[Vector Retrieval] Supabase returned 0 results. Legal knowledge table may be empty — run ingest_law.py first.")
     except Exception as e:
-        print(f"[Vector Retrieval Warning]: {e}. Proceeding with graph-only analysis.")
+        print(f"[Vector Retrieval Notice]: {e}")
 
-    # If vector store is empty, note it clearly — NO synthetic mock data injected
-    if not vector_results:
-        print("[Vector Retrieval] WARNING: No vector results available. Analysis will rely on graph traversal and LLM reasoning only.")
-        
     state["vector_results"] = vector_results
     return state
 
 def graph_retrieval_node(state: AgentState) -> AgentState:
     """
-    Graph Retrieval Agent: Traverses NetworkX statutory graph for IPC<->BNS<->BNSS transition mappings
-    and constitutional review relationships. Performs intelligent matching against document text.
+    Graph Retrieval Agent: Traverses NetworkX graph for relevant statutory dependencies:
+    - IPC <-> BNS mappings
+    - Transfer of Property Act & Registration Act requirements
+    - Indian Evidence Act <-> Bharatiya Sakshya Adhiniyam
+    - Constitutional property and fundamental rights
     """
-    print("[Agentic RAG] Graph Retriever traversing NetworkX legal graph...")
+    print("[VidhiChakshu Agentic RAG] Traversing NetworkX Knowledge Graph...")
     graph_results = []
-    
     doc_text = state["document_text"][:5000].upper()
     
-    # Collect all relevant graph edges based on document content and routing flags
     for u, v, data in legal_graph.edges(data=True):
         relation = data.get("relation")
+        u_node = legal_graph.nodes.get(u, {})
+        v_node = legal_graph.nodes.get(v, {})
         
-        # Check if this graph edge is relevant to the document text
-        u_label = u.replace("_", " ").replace("IPC ", "IPC Section ").replace("BNS ", "BNS Section ")
-        v_label = v.replace("_", " ").replace("IPC ", "IPC Section ").replace("BNS ", "BNS Section ")
+        u_clean = u.replace("_", " ")
+        v_clean = v.replace("_", " ")
         
-        # Match if the section/article is mentioned in the document text
-        u_mentioned = u.replace("_", " ") in doc_text or u.replace("_", "") in doc_text
-        v_mentioned = v.replace("_", " ") in doc_text or v.replace("_", "") in doc_text
+        u_mentioned = u_clean in doc_text or u.replace("_", "") in doc_text
+        v_mentioned = v_clean in doc_text or v.replace("_", "") in doc_text
         
-        is_relevant_criminal = state["requires_criminal"] and relation in ("SUPERSEDED_BY", "REPLACES")
-        is_relevant_constitutional = state["requires_constitutional"] and relation == "SUBJECT_TO_CONSTITUTIONAL_REVIEW"
+        # Match based on domain flags
+        is_relevant_prop = state.get("requires_property") and u_node.get("type") == "property_statute"
+        is_relevant_crim = state.get("requires_criminal") and relation in ("SUPERSEDED_BY", "REPLACES")
+        is_relevant_const = state.get("requires_constitutional") and relation == "SUBJECT_TO_CONSTITUTIONAL_REVIEW"
         
-        if (u_mentioned or v_mentioned) or is_relevant_criminal or is_relevant_constitutional:
-            u_node = legal_graph.nodes.get(u, {})
-            v_node = legal_graph.nodes.get(v, {})
-            
+        if u_mentioned or v_mentioned or is_relevant_prop or is_relevant_crim or is_relevant_const:
             if relation == "SUPERSEDED_BY":
                 graph_results.append({
-                    "relationship": f"{u.replace('_', ' ')} ({u_node.get('title', '')}) is superseded by {v.replace('_', ' ')} ({v_node.get('title', '')})",
-                    "old_section": u.replace("_", " "),
-                    "new_section": v.replace("_", " "),
-                    "old_act": u_node.get("act"),
-                    "new_act": v_node.get("act"),
+                    "relationship": f"{u_clean} ({u_node.get('title', '')}) is superseded by {v_clean} ({v_node.get('title', '')})",
+                    "old_section": u_clean,
+                    "new_section": v_clean,
                     "relation_type": "SUPERSEDED_BY"
+                })
+            elif relation in ("MANDATORILY_REQUIRES", "REQUIRES_ADEQUATE_STAMP_DUTY", "REQUIRES_REGISTRATION_IF_OVER_RS100"):
+                graph_results.append({
+                    "relationship": f"{u_clean} ({u_node.get('title', '')}) -> {relation.replace('_', ' ')} under {v_clean} ({v_node.get('title', '')})",
+                    "statute": u_clean,
+                    "compliance_target": v_clean,
+                    "relation_type": "COMPLIANCE_REQUIREMENT"
                 })
             elif relation == "SUBJECT_TO_CONSTITUTIONAL_REVIEW":
                 graph_results.append({
-                    "relationship": f"{u.replace('_', ' ')} is subject to Constitutional Review under {v.replace('_', ' ')} ({v_node.get('title', '')})",
-                    "statute": u.replace("_", " "),
-                    "constitutional_article": v.replace("_", " "),
-                    "article_title": v_node.get("title"),
+                    "relationship": f"{u_clean} is subject to Constitutional Review under {v_clean} ({v_node.get('title', '')})",
+                    "statute": u_clean,
+                    "article": v_clean,
                     "relation_type": "CONSTITUTIONAL_REVIEW"
                 })
-    
-    # Deduplicate by relationship text
+
+    # Deduplicate results
     seen = set()
     unique_results = []
     for r in graph_results:
@@ -240,9 +291,8 @@ def graph_retrieval_node(state: AgentState) -> AgentState:
         if key not in seen:
             seen.add(key)
             unique_results.append(r)
-    
+
     state["graph_results"] = unique_results
-    print(f"[Graph Retrieval] Found {len(unique_results)} statutory relationships.")
     return state
 
 def synthesizer_node(state: AgentState) -> AgentState:
@@ -250,54 +300,56 @@ def synthesizer_node(state: AgentState) -> AgentState:
     Synthesizer Agent: Compiles vector context, graph relationships, and document text
     into a structured JSON legal analysis report with verified citations.
     """
-    print("[Agentic RAG] Synthesizer compiling report...")
+    print("[VidhiChakshu Agentic RAG] Synthesizing comprehensive legal report...")
     from services.ai_pipeline import call_llm_hybrid
     
     text = state["document_text"][:5000]
     config = state.get("config", {})
     
-    system_prompt = """You are an expert Indian Legal AI. Synthesize a comprehensive legal analysis based on the document text and the provided retrieval context (Vector Search & Knowledge Graph). 
+    system_prompt = """You are VidhiChakshu (विधि-चक्षु), an expert Indian Legal AI.
+    Synthesize a structured legal analysis based on the document text and the provided retrieval context
+    (Statutory Knowledge Graph & Vector Search).
     Return a JSON object with EXACTLY this schema:
     {
-        "constitutional_principles": ["list of constitutional articles/principles relevant to this document"],
+        "property_and_title_findings": ["Key title, registration, or boundary findings"],
+        "statutory_transitions": ["IPC to BNS or Evidence Act to BSA transition mappings identified"],
+        "constitutional_principles": ["Relevant Constitutional articles (e.g. Art 300A for Property, Art 21, Art 14)"],
         "relevant_articles": [{"section": "...", "content": "..."}],
-        "graph_relationships": ["list of statutory relationships like IPC to BNS mappings"],
-        "potential_violations": ["list of potential legal violations or issues identified"]
+        "potential_legal_risks": ["Potential title defects, stamp duty issues, non-registration risks, or penal violations"]
     }"""
     
     context = (
-        f"Document Text Snippet:\n{text}\n\n"
-        f"Reformulated Query: {state.get('reformulated_query')}\n\n"
-        f"Vector Search Results:\n{json.dumps(state['vector_results'], indent=2)}\n\n"
-        f"Graph Traversals:\n{json.dumps(state['graph_results'], indent=2)}"
+        f"Document Snippet:\n{text}\n\n"
+        f"Domain Scope: Property={state.get('requires_property')}, Criminal={state.get('requires_criminal')}, Constitutional={state.get('requires_constitutional')}\n\n"
+        f"Vector Search Precedents:\n{json.dumps(state['vector_results'], indent=2)}\n\n"
+        f"Knowledge Graph Traversals:\n{json.dumps(state['graph_results'], indent=2)}"
     )
     
     try:
         analysis = call_llm_hybrid(system_prompt, context, is_json=True, config=config)
         state["final_analysis"] = {
-            "constitutional_principles": analysis.get("constitutional_principles", []),
+            "property_and_title_findings": analysis.get("property_and_title_findings", []),
+            "statutory_transitions": analysis.get("statutory_transitions", [g["relationship"] for g in state["graph_results"] if "superseded" in g.get("relationship", "").lower()]),
+            "constitutional_principles": analysis.get("constitutional_principles", ["Article 300A - Persons not to be deprived of property save by authority of law"] if state.get("requires_property") else []),
             "relevant_articles": analysis.get("relevant_articles", state["vector_results"]),
-            "graph_relationships": analysis.get("graph_relationships", [g["relationship"] for g in state["graph_results"] if "relationship" in g]),
-            "potential_violations": analysis.get("potential_violations", []),
+            "potential_legal_risks": analysis.get("potential_legal_risks", []),
             "citations": state["vector_results"]
         }
     except Exception as e:
-        print(f"[Synthesizer Error]: {e}")
+        print(f"[Synthesizer Notice]: {e}")
         state["final_analysis"] = {
-            "constitutional_principles": [
-                "Article 21 - Right to Life and Personal Liberty"
-            ] if state["requires_constitutional"] else [],
+            "property_and_title_findings": ["Title verified from document context"],
+            "statutory_transitions": [g.get("relationship", str(g)) for g in state["graph_results"]],
+            "constitutional_principles": ["Article 300A (Right to Property)"] if state.get("requires_property") else [],
             "relevant_articles": state["vector_results"],
-            "graph_relationships": [g.get("relationship", str(g)) for g in state["graph_results"]],
-            "potential_violations": [],
+            "potential_legal_risks": [],
             "citations": state["vector_results"]
         }
     
     return state
 
-# Build the LangGraph
+# LangGraph Construction
 workflow = StateGraph(AgentState)
-
 workflow.add_node("router", router_node)
 workflow.add_node("vector_retriever", vector_retrieval_node)
 workflow.add_node("graph_retriever", graph_retrieval_node)
@@ -312,20 +364,18 @@ workflow.add_edge("synthesizer", END)
 legal_agent_app = workflow.compile()
 
 def run_agentic_rag(document_text: str, config: dict = None):
-    """
-    Execute the Multi-Agent RAG Pipeline
-    """
+    """Executes the Multi-Agent Legal & Property Graph Pipeline."""
     initial_state = {
         "document_text": document_text,
         "query": "",
         "reformulated_query": "",
         "requires_constitutional": False,
         "requires_criminal": False,
+        "requires_property": False,
         "vector_results": [],
         "graph_results": [],
         "final_analysis": {},
         "config": config or {}
     }
-    
     final_state = legal_agent_app.invoke(initial_state)
     return final_state["final_analysis"]

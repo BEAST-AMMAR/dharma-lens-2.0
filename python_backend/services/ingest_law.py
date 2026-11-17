@@ -7,16 +7,6 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env.loca
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
 load_dotenv()
 
-import site
-
-user_site = site.getusersitepackages()
-if os.path.exists(user_site) and user_site not in sys.path:
-    sys.path.append(user_site)
-
-hermes_venv_site = os.path.expanduser(r"~\AppData\Local\hermes\hermes-agent\venv\Lib\site-packages")
-if os.path.exists(hermes_venv_site) and hermes_venv_site not in sys.path:
-    sys.path.append(hermes_venv_site)
-
 from sentence_transformers import SentenceTransformer
 from supabase import create_client, Client
 
@@ -259,14 +249,113 @@ def run_ingestion_pipeline():
         },
         {
             "source": "Constitution",
-            "section": "Article 226",
-            "title": "Power of High Courts to Issue Writs",
-            "content": "Every High Court shall have the power throughout the territories in relation to which it exercises jurisdiction, to issue to any person or authority directions, orders or writs, including writs in the nature of habeas corpus, mandamus, prohibition, quo warranto and certiorari."
+            "section": "Article 300A",
+            "title": "Persons Not to Be Deprived of Property Save by Authority of Law",
+            "content": "No person shall be deprived of his property save by authority of law. Recognizes property ownership as a human and constitutional right."
+        },
+
+        # ── Transfer of Property Act, 1882 (Land & Property Conveyancing) ──
+        {
+            "source": "TPA",
+            "section": "54",
+            "title": "Sale of Immovable Property",
+            "content": "Sale is a transfer of ownership in exchange for a price paid or promised or part-paid and part-promised. In the case of tangible immovable property of the value of one hundred rupees and upwards, transfer can be made only by a registered instrument.",
+            "replaces": None
+        },
+        {
+            "source": "TPA",
+            "section": "58",
+            "title": "Mortgage and Mortgage-money Defined",
+            "content": "A mortgage is the transfer of an interest in specific immovable property for the purpose of securing the payment of money advanced or to be advanced by way of loan, an existing or future debt, or the performance of an engagement which may give rise to a pecuniary liability.",
+            "replaces": None
+        },
+        {
+            "source": "TPA",
+            "section": "105",
+            "title": "Lease of Immovable Property",
+            "content": "A lease of immovable property is a transfer of a right to enjoy such property, made for a certain time, express or implied, or in perpetuity, in consideration of a price paid or promised, or of money, a share of crops, service or any other thing of value.",
+            "replaces": None
+        },
+        {
+            "source": "TPA",
+            "section": "122",
+            "title": "Gift Defined",
+            "content": "Gift is the transfer of certain existing movable or immovable property made voluntarily and without consideration, by one person, called the donor, to another, called the donee, and accepted by or on behalf of the donee.",
+            "replaces": None
+        },
+        {
+            "source": "TPA",
+            "section": "53A",
+            "title": "Part Performance",
+            "content": "Where any person contracts to transfer for consideration any immovable property by writing signed by him or on his behalf, and the transferee has in part performance of the contract taken possession of the property, the transferor is debarred from enforcing against the transferee any right in respect of the property.",
+            "replaces": None
+        },
+
+        # ── Indian Registration Act, 1908 ──
+        {
+            "source": "Registration Act",
+            "section": "17",
+            "title": "Documents of which Registration is Compulsory",
+            "content": "Instruments of gift of immovable property; other non-testamentary instruments which purport or operate to create, declare, assign, limit or extinguish any right, title or interest of the value of one hundred rupees and upwards, to or in immovable property; leases of immovable property from year to year, or for any term exceeding one year, or reserving a yearly rent.",
+            "replaces": None
+        },
+        {
+            "source": "Registration Act",
+            "section": "49",
+            "title": "Effect of Non-Registration of Documents Required to be Registered",
+            "content": "No document required by section 17 to be registered shall affect any immovable property comprised therein, or be received as evidence of any transaction affecting such property, unless it has been registered.",
+            "replaces": None
+        },
+
+        # ── Indian Stamp Act, 1899 ──
+        {
+            "source": "Stamp Act",
+            "section": "33",
+            "title": "Examination and Impounding of Instruments",
+            "content": "Every person having by law or consent of parties authority to receive evidence, and every person in charge of a public office, before whom any instrument chargeable with duty is produced, shall impound the same if it appears that such instrument is not duly stamped.",
+            "replaces": None
+        },
+        {
+            "source": "Stamp Act",
+            "section": "35",
+            "title": "Instruments Not Duly Stamped Inadmissible in Evidence",
+            "content": "No instrument chargeable with duty shall be admitted in evidence for any purpose by any person having by law or consent of parties authority to receive evidence, or shall be acted upon, registered or authenticated by any such person or by any public officer, unless such instrument is duly stamped.",
+            "replaces": None
+        },
+
+        # ── Bharatiya Sakshya Adhiniyam, 2023 (BSA - Evidence Law) ──
+        {
+            "source": "BSA",
+            "section": "57",
+            "title": "Primary Evidence",
+            "content": "Primary evidence means the document itself produced for the inspection of the Court. Where a document is executed in several parts, each part is primary evidence of the document.",
+            "replaces": "IEA 62"
+        },
+        {
+            "source": "BSA",
+            "section": "58",
+            "title": "Secondary Evidence",
+            "content": "Secondary evidence includes certified copies, copies made from the original by mechanical processes, copies compared with the original, counterparts of documents as against the parties who did not execute them, and oral accounts of contents given by persons who have seen it.",
+            "replaces": "IEA 63"
+        },
+        {
+            "source": "BSA",
+            "section": "61",
+            "title": "Electronic or Digital Record",
+            "content": "Nothing in this Adhiniyam shall apply to electronic records unless accompanied by a certificate signed by a person occupying a responsible official position in relation to the operation of the relevant device.",
+            "replaces": "IEA 65B"
+        },
+        {
+            "source": "BSA",
+            "section": "84",
+            "title": "Presumption as to Ancient Documents (30 Years Old)",
+            "content": "Where any document, purporting or proved to be thirty years old, is produced from any custody which the Court in the particular case considers proper, the Court may presume that the signature and every other part of such document, which purports to be in the handwriting of any particular person, is in that person's handwriting, and that it was duly executed and attested.",
+            "replaces": "IEA 90"
         },
     ]
     
     print(f"\n{'='*60}")
-    print(f"  DHARMA LENS - Legal Knowledge Ingestion Pipeline")
+    print(f"  VIDHICHAKSHU - Legal Knowledge Ingestion Pipeline")
     print(f"  Corpus Size: {len(law_corpus)} statutory sections")
     print(f"  Target: Supabase pgvector (legal_knowledge table)")
     print(f"{'='*60}\n")
