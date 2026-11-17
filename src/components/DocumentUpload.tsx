@@ -113,27 +113,66 @@ const DocumentUpload = ({ onUploadComplete }: DocumentUploadProps) => {
                 // Track simulated progress
                 setFiles(prev => prev.map(f => f.id === fileObj.id ? { ...f, progress: 65 } : f));
 
-                const response = await fetch(`${apiUrl}/api/upload-file`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${sessionToken}`
-                  },
-                  body: JSON.stringify({
-                    fileName: safeName,
-                    fileData: base64Data,
-                    mimeType: fileObj.file.type
-                  })
+                const payload = JSON.stringify({
+                  fileName: safeName,
+                  fileData: base64Data,
+                  mimeType: fileObj.file.type || 'application/octet-stream'
                 });
 
-                const data = await response.json();
-                if (data.success && data.filePath) {
+                let response: Response | null = null;
+                let lastError = "";
+
+                // Route 1: Node.js API Gateway (Port 3000)
+                try {
+                  response = await fetch(`${apiUrl}/api/upload-file`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${sessionToken}`
+                    },
+                    body: payload
+                  });
+                } catch (netErr: any) {
+                  lastError = netErr.message;
+                  console.warn('[Upload] Node gateway unreachable, attempting direct AI engine:', netErr);
+                }
+
+                // Route 2: Direct Python Engine fallback (Port 8000)
+                if (!response || !response.ok) {
+                  try {
+                    const fallbackRes = await fetch(`http://localhost:8000/api/upload-file`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${sessionToken}`
+                      },
+                      body: payload
+                    });
+                    if (fallbackRes.ok) {
+                      response = fallbackRes;
+                    }
+                  } catch (pyErr: any) {
+                    console.warn('[Upload] Python direct fallback unreachable:', pyErr);
+                  }
+                }
+
+                if (!response) {
+                  throw new Error(`Upload server unreachable: ${lastError || 'Could not connect to localhost:3000 or localhost:8000'}`);
+                }
+
+                const data = await response.json().catch(() => null);
+
+                if (!response.ok) {
+                  throw new Error(data?.error || data?.detail || `Server returned error (${response.status})`);
+                }
+
+                if (data && data.success && data.filePath) {
                   finalPath = data.filePath;
                   uploadSucceeded = true;
                   setFiles(prev => prev.map(f => f.id === fileObj.id ? { ...f, progress: 100, status: "complete", path: finalPath } : f));
                   resolve();
                 } else {
-                  reject(new Error(data.error || "Gateway upload failed"));
+                  reject(new Error(data?.error || "Gateway upload failed"));
                 }
               } catch (gatewayErr: any) {
                 reject(gatewayErr);

@@ -1,6 +1,9 @@
 import sys
 import os
 import glob
+import time
+import re
+import base64
 import pydantic
 from dotenv import load_dotenv
 
@@ -78,9 +81,38 @@ class ChatRequest(BaseModel):
 class ExportPDFRequest(BaseModel):
     document_data: dict
 
+class UploadFileRequest(BaseModel):
+    fileName: str
+    fileData: str
+    mimeType: str = "application/octet-stream"
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "VidhiChakshu AI Engine", "version": "3.0.0"}
+
+@app.post("/api/upload-file")
+@app.post("/upload")
+async def upload_document_direct(request: UploadFileRequest, authorization: str = Header(None)):
+    verify_supabase_token(authorization)
+    uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "uploads"))
+    os.makedirs(uploads_dir, exist_ok=True)
+    
+    clean_name = "".join([c if c.isalnum() or c in "._-" else "_" for c in request.fileName or "document.pdf"])
+    safe_name = f"{int(time.time()*1000)}_{clean_name}"
+    target_path = os.path.join(uploads_dir, safe_name)
+    
+    base64_data = re.sub(r"^data:[^,]+,", "", request.fileData)
+    file_bytes = base64.b64decode(base64_data)
+    with open(target_path, "wb") as f:
+        f.write(file_bytes)
+        
+    print(f"[Python Engine Upload] Successfully stored file: {target_path} ({len(file_bytes)} bytes)")
+    return {
+        "success": True,
+        "filePath": target_path,
+        "fileName": safe_name,
+        "size": len(file_bytes)
+    }
 
 # Module-level Supabase client for auth verification
 supabase_auth_client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -157,8 +189,9 @@ def background_process(job_id: str, document_path: str, config: dict, auth_token
     """
     from services.ai_pipeline import get_supabase_client, process_document_pipeline
     
+    job_store[job_id] = {"status": "processing"}
     sp = get_supabase_client(auth_token)
-    
+
     # 1. Record job start in Supabase database
     try:
         sp.table("processing_jobs").insert({
@@ -172,7 +205,6 @@ def background_process(job_id: str, document_path: str, config: dict, auth_token
         print(f"[VidhiChakshu DB Notice]: Could not create processing_jobs record: {e}")
 
     try:
-        job_store[job_id] = {"status": "processing"}
         result = process_document_pipeline(document_path, config, auth_token)
         
         # 2. Update memory store

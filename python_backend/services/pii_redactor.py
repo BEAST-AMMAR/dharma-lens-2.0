@@ -19,6 +19,15 @@ def get_presidio_engines():
         return _analyzer, _anonymizer
     _presidio_attempted = True
     try:
+        import spacy
+        # Guard: Check if spacy model is already downloaded locally before invoking Presidio
+        # to avoid triggering slow 400MB runtime pip downloads
+        installed = spacy.util.get_installed_models()
+        if not installed:
+            print("[VidhiChakshu PII] Spacy offline; using high-speed Indian Regex Sanitizer.")
+            _analyzer, _anonymizer = None, None
+            return _analyzer, _anonymizer
+
         from presidio_analyzer import AnalyzerEngine
         from presidio_anonymizer import AnonymizerEngine
         _analyzer = AnalyzerEngine()
@@ -29,7 +38,7 @@ def get_presidio_engines():
     return _analyzer, _anonymizer
 
 def redact_indian_pii_regex(text: str) -> str:
-    """Regex sanitizer for critical Indian PII identifiers (Aadhaar, PAN, Phone, Email)."""
+    """Regex sanitizer for critical Indian PII identifiers (Aadhaar, PAN, Phone, Email, Bank Accounts)."""
     if not text:
         return text
     # Redact 12-digit Aadhaar numbers
@@ -40,6 +49,8 @@ def redact_indian_pii_regex(text: str) -> str:
     text = re.sub(r'\b(?:\+91[-\s]?)?[6-9]\d{9}\b', '[PHONE_REDACTED]', text)
     # Redact Emails
     text = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL_REDACTED]', text)
+    # Redact Bank Account Numbers (9 to 18 digits)
+    text = re.sub(r'\b(?:A/C|Account|Acc|Bank\s+A/c)\s*[:\-]?\s*\d{9,18}\b', '[BANK_ACCOUNT_REDACTED]', text, flags=re.I)
     return text
 
 def redact_pii(text: str) -> str:

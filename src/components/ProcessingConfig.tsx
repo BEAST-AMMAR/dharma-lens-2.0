@@ -71,21 +71,65 @@ const ProcessingConfig = ({ documentPath, onProcessingComplete }: ProcessingConf
     setIsProcessing(true);
 
     try {
-      // Get current session for JWT
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Get current session for JWT with sovereign offline fallback
+      let token = "vidhichakshu-local-admin-token";
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          token = session.access_token;
+        } else {
+          const stored = localStorage.getItem("vidhichakshu-offline-session");
+          if (stored) {
+            token = JSON.parse(stored).access_token || token;
+          }
+        }
+      } catch {
+        // use fallback token
+      }
 
       const apiUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000';
-      const response = await fetch(`${apiUrl}/api/process-document`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ documentPath, config })
-      });
+      let response: Response | null = null;
+      let effectiveBaseUrl = apiUrl;
 
-      const data = await response.json();
+      // Primary: Node.js API Gateway
+      try {
+        response = await fetch(`${apiUrl}/api/process-document`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ documentPath, config })
+        });
+      } catch (gateErr) {
+        console.warn('[Process] Gateway unreachable, attempting direct Python engine:', gateErr);
+      }
+
+      // Secondary: Direct Python AI Engine (Port 8000)
+      if (!response || !response.ok) {
+        try {
+          const directPyRes = await fetch(`http://localhost:8000/process`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ documentPath, config })
+          });
+          if (directPyRes.ok) {
+            response = directPyRes;
+            effectiveBaseUrl = 'http://localhost:8000';
+          }
+        } catch (directErr) {
+          console.warn('[Process] Direct Python engine unreachable:', directErr);
+        }
+      }
+
+      if (!response) {
+        throw new Error('Both API Gateway (port 3000) and AI Engine (port 8000) are currently unreachable.');
+      }
+
+      const data = await response.json().catch(() => null);
 
       if (response.status === 429) {
         toast({
@@ -99,7 +143,7 @@ const ProcessingConfig = ({ documentPath, onProcessingComplete }: ProcessingConf
       if (!response.ok || data?.success === false) {
         toast({
           title: "Processing failed",
-          description: data?.error || "Failed to process document",
+          description: data?.error || data?.detail || "Failed to process document",
           variant: "destructive",
         });
         return;
@@ -121,12 +165,17 @@ const ProcessingConfig = ({ documentPath, onProcessingComplete }: ProcessingConf
           attempts++;
           await new Promise(resolve => setTimeout(resolve, 3000));
           
-          const statusRes = await fetch(`${apiUrl}/api/job/${jobId}`, {
+          const statusUrl = effectiveBaseUrl.includes(':8000')
+            ? `http://localhost:8000/job/${jobId}`
+            : `${apiUrl}/api/job/${jobId}`;
+
+          const statusRes = await fetch(statusUrl, {
             headers: {
               'Authorization': `Bearer ${token}`
             }
           });
-          const statusData = await statusRes.json();
+          const statusData = await statusRes.json().catch(() => null);
+          if (!statusData) continue;
           
           if (statusData.status === 'completed') {
             jobFinished = true;

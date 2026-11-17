@@ -75,3 +75,7 @@ htmlcov/
 
 # Supabase temp files
 supabase/.temp/
+
+# User Uploads (Keep folder, ignore files)
+uploads/*
+!uploads/.gitkeep

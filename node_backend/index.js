@@ -68,7 +68,11 @@ async function verifyUserToken(authHeader) {
 // SAFE PYTHON ENGINE BASE URL RESOLUTION
 // ──────────────────────────────────────────────────────────────────
 function getPythonEngineBaseUrl() {
-  const raw = process.env.PYTHON_ENGINE_URL || 'http://localhost:8000/process';
+  let raw = process.env.PYTHON_ENGINE_URL || 'http://localhost:8000/process';
+  // If running locally without Docker container, fallback python_engine hostname to localhost
+  if (raw.includes('python_engine') && !process.env.DOCKER_CONTAINER) {
+    raw = raw.replace('python_engine', 'localhost');
+  }
   try {
     const parsed = new URL(raw);
     return `${parsed.protocol}//${parsed.host}`;
@@ -84,7 +88,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'VidhiChakshu API Gateway', version: '3.0.0' });
@@ -112,10 +117,12 @@ app.post('/api/upload-file', async (req, res) => {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
 
-    const safeName = `${Date.now()}_${(fileName || 'document.pdf').replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const cleanName = (fileName || 'document.pdf').replace(/[^a-zA-Z0-9._-]/g, '_');
+    const safeName = `${Date.now()}_${cleanName}`;
     const targetPath = path.join(uploadsDir, safeName);
 
-    const base64Data = fileData.replace(/^data:([A-Za-z-+/]+);base64,/, '');
+    // Strip data URL scheme prefix if present (e.g. "data:application/pdf;base64,")
+    const base64Data = fileData.replace(/^data:[^,]+,/, '');
     const buffer = Buffer.from(base64Data, 'base64');
     fs.writeFileSync(targetPath, buffer);
 
@@ -123,11 +130,12 @@ app.post('/api/upload-file', async (req, res) => {
     res.json({
       success: true,
       filePath: targetPath,
-      fileName: safeName
+      fileName: safeName,
+      size: buffer.length
     });
   } catch (err) {
     console.error('Error saving local file upload:', err);
-    res.status(500).json({ error: 'Failed to save local file' });
+    res.status(500).json({ error: err.message || 'Failed to save local file' });
   }
 });
 
@@ -259,8 +267,12 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error('[Unhandled Gateway Error]:', err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: err.message || 'Internal Server Error',
+    code: err.code || err.type || 'GATEWAY_ERROR'
+  });
 });
 
 app.listen(PORT, () => {
