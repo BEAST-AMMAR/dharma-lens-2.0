@@ -47,8 +47,8 @@ This guide covers the containerization, orchestration, and continuous integratio
 
 ### 1. Clone & Setup
 ```bash
-git clone https://github.com/BEAST-AMMAR/dharma-lens-2.0.git
-cd "dharma-lens-2.0"
+git clone https://github.com/BEAST-AMMAR/vidhichakshu.git
+cd "vidhichakshu"
 ```
 
 ### 2. Configure Environment

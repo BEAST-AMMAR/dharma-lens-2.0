@@ -1,7 +1,7 @@
 # VidhiChakshu (विधि-चक्षु) 3.0: Complete Project Codebase Analysis Report
 ## Long-Form Comprehensive Technical Audit, Architectural Analysis & System Operation Manual
 **Project Version:** 3.0.0  
-**Repository:** `BEAST-AMMAR/dharma-lens-2.0`  
+**Repository:** `BEAST-AMMAR/vidhichakshu`  
 **Date of Audit:** November 2026  
 **Auditor / Engineering Agent:** Antigravity AI (Google DeepMind Team)  
 

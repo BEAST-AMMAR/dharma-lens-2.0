@@ -1,7 +1,6 @@
 # VidhiChakshu (विधि-चक्षु) 3.0
 ### The AI Vision for Indian Legal & Heritage Documents
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-gold.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED.svg?logo=docker&logoColor=white)](docker-compose.yml)
 [![FastAPI](https://img.shields.io/badge/Python-3.11+-3776AB.svg?logo=python&logoColor=white)](python_backend/)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-339933.svg?logo=node.js&logoColor=white)](node_backend/)
@@ -130,8 +129,8 @@ VidhiChakshu bridges the gap between historical heritage documentation and the m
 
 ### 2. Clone & Environment Configuration
 ```bash
-git clone https://github.com/BEAST-AMMAR/dharma-lens-2.0.git
-cd "dharma-lens-2.0"
+git clone https://github.com/BEAST-AMMAR/vidhichakshu.git
+cd "vidhichakshu"
 
 # Copy environment template
 cp .env.example .env
@@ -180,9 +179,3 @@ cd node_backend && npm test
 * **Fail-Closed PII Redaction**: Sensitive Indian identifiers (12-digit Aadhaar, 10-character PAN, mobile numbers) are redacted before text is transmitted to any model.
 * **100% Air-Gapped Mode**: The system can execute completely offline using Ollama (`Qwen2.5-7B`, `Phi-4-mini`) without network dependencies.
 * **Fail-Fast Validation**: Backend services refuse to start if security credentials or configurations are missing.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
