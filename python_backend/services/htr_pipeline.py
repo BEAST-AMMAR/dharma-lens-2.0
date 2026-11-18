@@ -128,6 +128,46 @@ def transcribe_with_vision_vlm(
             "--- MODERN LEGAL MEANING & SUMMARY ---\n"
             "[Summary of title transfer, parties, and plot details]"
         ),
+        "kaithi": (
+            "You are a master paleographer specializing in 18th–20th century Kaithi script (कैथी लिपी) "
+            "historically used across Bihar, Eastern Uttar Pradesh, and Bengal for court records, village revenue ledgers, "
+            "Khatians, Kewalas (Sale Deeds), and Zamindari Jamabandis.\n"
+            "Task:\n"
+            "1. Transcribe the cursive Kaithi handwriting accurately, distinguishing confusing glyphs (e.g. ra, da, ka).\n"
+            "2. Transliterate into clean modern standard Devanagari Hindi and English.\n"
+            "3. Extract all Tauzi numbers, Thana numbers, Khasra numbers, Mauza/village names, and Chauhaddi boundaries.\n"
+            "Format your output clearly with:\n"
+            "--- TRANSLITERATION (MODERN DEVANAGARI) ---\n"
+            "[Transliterated text]\n\n"
+            "--- ENGLISH REVENUE SUMMARY ---\n"
+            "[Summary of title, consideration, parties, and boundary schedule]"
+        ),
+        "grantha": (
+            "You are an expert epigraphist specializing in historical South Indian scripts, particularly Grantha (கிரந்தம் / ग्रन्थ) "
+            "and Old Tamil-Sanskrit copper plate grants, temple Sasana deeds, and land endowments.\n"
+            "Task:\n"
+            "1. Transcribe the Grantha ligatures and Sanskrit-Tamil bilingual inscriptions faithfully.\n"
+            "2. Transliterate into modern standard Tamil and Devanagari Sanskrit with an English translation.\n"
+            "3. Identify the royal dynasty / donor, recipient, boundary stones (Vamanakallu / Trisulakallu), and tax exemptions.\n"
+            "Format your output clearly with:\n"
+            "--- TRANSLITERATION (TAMIL & DEVANAGARI) ---\n"
+            "[Transliterated text]\n\n"
+            "--- LEGAL ENDOWMENT & BOUNDARY SUMMARY ---\n"
+            "[Summary of grant rights, boundaries, and parties]"
+        ),
+        "old_devanagari": (
+            "You are an expert paleographer in archaic Devanagari (प्राचीन देवनागरी / शारदा) used in historical "
+            "princely state Sanads, royal treaties, property wills, and Brahmin land endowments (Brahmadeya / Birt).\n"
+            "Task:\n"
+            "1. Transcribe the archaic Devanagari text, resolving historical spelling variants, top-line omissions, and abbreviations.\n"
+            "2. Provide clean standard Devanagari Hindi and English translation.\n"
+            "3. Extract all grantor, grantee, village, Chauhaddi boundaries, and property covenants.\n"
+            "Format your output clearly with:\n"
+            "--- TRANSLITERATION (STANDARD DEVANAGARI) ---\n"
+            "[Transliterated text]\n\n"
+            "--- HISTORICAL TITLE SUMMARY ---\n"
+            "[Summary of title, boundaries, and rights]"
+        ),
         "general": (
             "You are VidhiChakshu (विधि-चक्षु), an advanced Indian legal document vision AI. "
             "Transcribe all handwritten and printed text from this legal document accurately.\n"
@@ -146,6 +186,15 @@ def transcribe_with_vision_vlm(
     elif "persian" in selected_script or "urdu" in selected_script or "arabic" in selected_script or "nastaliq" in selected_script:
         sys_prompt = script_prompts["perso-arabic"]
         display_script = "Perso-Arabic Nastaliq (Urdu/Hindi Transliterated)"
+    elif "kaithi" in selected_script or "bhojpuri" in selected_script or "bihar" in selected_script:
+        sys_prompt = script_prompts["kaithi"]
+        display_script = "Kaithi Script (Bihar/UP Court Transliterated)"
+    elif "grantha" in selected_script or "tamil" in selected_script:
+        sys_prompt = script_prompts["grantha"]
+        display_script = "Grantha / Old Tamil Script (Transliterated)"
+    elif "devanagari" in selected_script or "sharda" in selected_script:
+        sys_prompt = script_prompts["old_devanagari"]
+        display_script = "Archaic Devanagari / Sharda (Transliterated)"
     else:
         sys_prompt = script_prompts["general"]
         display_script = "Handwritten Legal Manuscript"
@@ -212,6 +261,18 @@ def process_perso_arabic_script(image_bytes: bytes, config: Optional[dict] = Non
     """Specialist handler for Persian / Urdu Nastaliq land revenue records."""
     return transcribe_with_vision_vlm(image_bytes, "perso-arabic", config)
 
+def process_kaithi_script(image_bytes: bytes, config: Optional[dict] = None) -> dict:
+    """Specialist handler for Kaithi script (Bihar/UP court records & Khatians)."""
+    return transcribe_with_vision_vlm(image_bytes, "kaithi", config)
+
+def process_grantha_script(image_bytes: bytes, config: Optional[dict] = None) -> dict:
+    """Specialist handler for Grantha and Old Tamil historical charters."""
+    return transcribe_with_vision_vlm(image_bytes, "grantha", config)
+
+def process_old_devanagari_script(image_bytes: bytes, config: Optional[dict] = None) -> dict:
+    """Specialist handler for archaic Devanagari and Sharda historical deeds."""
+    return transcribe_with_vision_vlm(image_bytes, "old_devanagari", config)
+
 def process_printed_image_ocr(image_bytes: bytes, config: Optional[dict] = None) -> dict:
     """Processes standard printed or modern handwritten documents with OCR + Vision fallback."""
     pil_img, _ = preprocess_historical_image(image_bytes)
@@ -243,6 +304,12 @@ def triage_and_transcribe_historical_doc(image_bytes: bytes, file_extension: str
         return process_halegannada_script(image_bytes, config)
     elif "persian" in target_script or "urdu" in target_script or "arabic" in target_script or "nastaliq" in target_script:
         return process_perso_arabic_script(image_bytes, config)
+    elif "kaithi" in target_script or "bihar" in target_script:
+        return process_kaithi_script(image_bytes, config)
+    elif "grantha" in target_script or "tamil" in target_script:
+        return process_grantha_script(image_bytes, config)
+    elif "devanagari" in target_script or "sharda" in target_script:
+        return process_old_devanagari_script(image_bytes, config)
     else:
         # If historical mode is enabled with 'auto', try general vision VLM
         if (config or {}).get("enableHistoricalHTR"):

@@ -283,6 +283,97 @@ ARCHAIC_LEGAL_LEXICON: List[Dict[str, Any]] = [
         "meaning": "Land reserved specifically for residential habitation within the village settlement boundary (Abadi).",
         "modern_significance": "Residential village land exempt from agricultural land revenue conversion rules.",
         "citizen_summary": "Village residential plot meant for building a house, not for farming."
+    },
+    # ── Eastern Indian (Kaithi / Bihar / Bengal) & Western Revenue Additions ──
+    {
+        "term": "Khatian",
+        "aliases": ["Khatiyan", "खतियान", "খতিয়ান"],
+        "origin": "Persian / Hindi",
+        "category": "Record of Rights (RoR)",
+        "meaning": "Official Cadastral Survey and Settlement Record of Rights (RoR) in Bihar, Jharkhand, and Bengal detailing title holders, plot boundaries, and tenancy status.",
+        "modern_significance": "Primary foundational document for establishing ancestral title and chain-of-title in Eastern India.",
+        "citizen_summary": "The master government survey document proving who owns what plot in the village."
+    },
+    {
+        "term": "Kewala",
+        "aliases": ["Kewalah", "Kaula", "केवाला"],
+        "origin": "Perso-Arabic",
+        "category": "Conveyance / Title Deed",
+        "meaning": "An absolute registered Sale Deed executed for transfer of immovable property in Bihar, Jharkhand, and eastern Uttar Pradesh.",
+        "modern_significance": "Equivalent to an absolute Sale Deed under Section 54 of the Transfer of Property Act, 1882.",
+        "citizen_summary": "Sale Deed proving full legal purchase and transfer of land ownership."
+    },
+    {
+        "term": "Malguzari",
+        "aliases": ["Malguzar", "मालगुज़ारी", "मालगुजारी"],
+        "origin": "Persian",
+        "category": "Revenue Assessment",
+        "meaning": "Land revenue or land rent payable by the landholder/proprietor to the government or state treasury.",
+        "modern_significance": "Modern Land Revenue (Lagaan) assessment paid to the state revenue department.",
+        "citizen_summary": "Annual government land tax or rent paid on the property."
+    },
+    {
+        "term": "Bakast",
+        "aliases": ["Bakashat", "Bakasht", "बकाश्त"],
+        "origin": "Persian",
+        "category": "Tenancy Rights",
+        "meaning": "Cultivated land held in direct possession and private cultivation by former Zamindars/proprietors at the time of Zamindari Abolition.",
+        "modern_significance": "Recognized as settled raiyati land with permanent heritable occupancy rights under state land reform acts.",
+        "citizen_summary": "Land directly farmed by the original owner that became their permanent property after land reforms."
+    },
+    {
+        "term": "Gair Mazarua",
+        "aliases": ["Gairmajarua", "Gair-Mazarua", "गैरमजरूआ", "गैर मजरूआ"],
+        "origin": "Arabic / Persian",
+        "category": "Public / Government Land",
+        "meaning": "Uncultivated or non-agricultural land. Divided into 'Aam' (common community land: roads, ponds, cremation grounds) and 'Khas' (state government proprietary waste/forest land).",
+        "modern_significance": "Government public land; alienation or private sale is illegal and void ab initio.",
+        "citizen_summary": "Government or common village land that cannot be privately sold or bought."
+    },
+    {
+        "term": "Tauzi",
+        "aliases": ["Tauzi No", "Touzi", "तौजी"],
+        "origin": "Persian",
+        "category": "Revenue Unit Identifier",
+        "meaning": "Revenue roll account number representing an estate (Mahal) on the Collectorate revenue register in Bengal and Bihar.",
+        "modern_significance": "Historical estate identifier vital for tracing root title in British-era land grants.",
+        "citizen_summary": "Old British-era revenue estate number used to trace ancient family land holdings."
+    },
+    {
+        "term": "Chakbandi",
+        "aliases": ["Chak-Bandi", "चकबंदी"],
+        "origin": "Hindi / Persian",
+        "category": "Land Consolidation",
+        "meaning": "Consolidation of scattered, fragmented agricultural land holdings into compact, rectangular plots (Chaks).",
+        "modern_significance": "Updates survey numbers and creates consolidated allotment registers with updated Chauhaddi.",
+        "citizen_summary": "Government land consolidation scheme that united scattered tiny plots into one large field."
+    },
+    {
+        "term": "Ferfar",
+        "aliases": ["Ferfar Nond", "फेरफार", "फेरफार नोंद"],
+        "origin": "Marathi",
+        "category": "Property Mutation",
+        "meaning": "Mutation register entry under Section 148 of the Maharashtra Land Revenue Code recording title transfers, partitions, or encumbrances.",
+        "modern_significance": "Official mutation extract (Village Form VI) required along with the 7/12 extract.",
+        "citizen_summary": "Official Maharashtra mutation register entry recording changes in land ownership."
+    },
+    {
+        "term": "Satbara",
+        "aliases": ["7/12", "7/12 Extract", "सातबारा", "सातबारा उतारा"],
+        "origin": "Marathi",
+        "category": "Record of Rights & Crops",
+        "meaning": "Village Form VII (Record of Rights, ownership, and liabilities) combined with Form XII (Register of crops and cultivation) in Maharashtra.",
+        "modern_significance": "Primary conclusive document of land title and occupancy rights in Maharashtra.",
+        "citizen_summary": "The master 7/12 property card showing who owns the land, loans on it, and what crops are grown."
+    },
+    {
+        "term": "Shajra",
+        "aliases": ["Shajra Map", "Aks Shajra", "शजरा", "شجرہ"],
+        "origin": "Arabic / Persian",
+        "category": "Cadastral Village Map",
+        "meaning": "Detailed cadastral map of the entire village displaying every field boundary, Khasra number, pathway, canal, and waterbody.",
+        "modern_significance": "Primary cadastral boundary map used in boundary disputes and partition suits.",
+        "citizen_summary": "The official cloth village map showing every single plot's shape and boundaries."
     }
 ]
 

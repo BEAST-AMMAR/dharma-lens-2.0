@@ -218,29 +218,53 @@ const ResultsDisplay = ({ result }: ResultsDisplayProps) => {
     try {
       const token = await getEffectiveToken();
       const apiUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:3000';
-
-      const response = await fetch(`${apiUrl}/api/export-pdf`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          document_data: {
-            ...result,
-            chauhaddi,
-            lineage,
-            title_chain: titleChain,
-            title_health_score: titleHealthScore,
-            title_defects: titleDefects,
-            archaic_terms: archaicTerms,
-            extracted_text: textData
-          }
-        })
+      const payload = JSON.stringify({
+        document_data: {
+          ...result,
+          chauhaddi,
+          lineage,
+          title_chain: titleChain,
+          title_health_score: titleHealthScore,
+          title_defects: titleDefects,
+          archaic_terms: archaicTerms,
+          extracted_text: textData
+        }
       });
 
-      if (!response.ok) {
-        throw new Error(`Export failed with HTTP status ${response.status}`);
+      let response: Response | null = null;
+      try {
+        response = await fetch(`${apiUrl}/api/export-pdf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: payload
+        });
+      } catch (gateErr) {
+        console.warn('[PDF Export] Gateway unreachable, trying direct Python engine:', gateErr);
+      }
+
+      if (!response || !response.ok) {
+        try {
+          const directPyRes = await fetch(`http://localhost:8000/api/export-pdf`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: payload
+          });
+          if (directPyRes.ok) {
+            response = directPyRes;
+          }
+        } catch (directErr) {
+          console.warn('[PDF Export] Direct engine unreachable:', directErr);
+        }
+      }
+
+      if (!response || !response.ok) {
+        throw new Error(`Export failed with HTTP status ${response?.status || 500}`);
       }
 
       const blob = await response.blob();

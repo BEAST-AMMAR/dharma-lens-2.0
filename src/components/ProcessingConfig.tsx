@@ -291,6 +291,9 @@ const ProcessingConfig = ({ documentPath, onProcessingComplete }: ProcessingConf
                 <SelectItem value="modi">Modi Script (Maharashtra 17th–20th c. Land Deeds - Paleography VLM)</SelectItem>
                 <SelectItem value="halegannada">Halegannada (Old Kannada Historical Grants - Epigraphy VLM)</SelectItem>
                 <SelectItem value="perso-arabic">Perso-Arabic (Urdu/Persian Nastaliq Revenue Records - Paleography VLM)</SelectItem>
+                <SelectItem value="kaithi">Kaithi Script (Bihar/UP Court Records, Khatians & Kewalas - Paleography VLM)</SelectItem>
+                <SelectItem value="grantha">Grantha / Old Tamil Script (Historical Sasana Land Charters - Epigraphy VLM)</SelectItem>
+                <SelectItem value="old_devanagari">Archaic Devanagari / Sharda (Royal Sanads, Treaties & Wills - Paleography VLM)</SelectItem>
               </SelectContent>
             </Select>
           </div>

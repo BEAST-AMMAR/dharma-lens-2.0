@@ -111,10 +111,39 @@ def test_certified_pdf_generation():
     assert len(pdf_bytes) > 1000
     assert pdf_bytes.startswith(b"%PDF")
 
+def test_expanded_regional_lexicon():
+    sample_text = (
+        "Recorded in Khatian No 40 as Bakast raiyati land. The Kewala was registered, "
+        "and Ferfar entry was confirmed on the 7/12 Satbara extract alongside the Shajra map."
+    )
+    terms = analyze_archaic_terms(sample_text)
+    term_names = [t["term"] for t in terms]
+    assert "Khatian" in term_names
+    assert "Bakast" in term_names
+    assert "Kewala" in term_names
+    assert "Ferfar" in term_names
+    assert "Satbara" in term_names
+    assert "Shajra" in term_names
+
+def test_sovereign_intelligence_fallback():
+    from services.ai_pipeline import fallback_sovereign_intelligence
+    sample_doc = "Registered Kewala executed on 12/05/1978 for Khasra No 102/3 in Village Rampur by Shri Ram Prakash."
+    entities = fallback_sovereign_intelligence("Extract entities into JSON", sample_doc, is_json=True)
+    assert "12/05/1978" in entities.get("dates", [])
+    assert "102/3" in entities.get("plot_or_survey_numbers", [])
+    assert any("Ram Prakash" in p for p in entities.get("people", []))
+
+    chauhaddi = fallback_sovereign_intelligence("Extract chauhaddi into JSON", sample_doc, is_json=True)
+    assert "chauhaddi" in chauhaddi
+    assert "north" in chauhaddi["chauhaddi"]
+    assert "lineage" in chauhaddi
+
 if __name__ == "__main__":
     test_pii_redaction_aadhaar()
     test_pii_redaction_pan()
     test_archaic_lexicon_detection()
+    test_expanded_regional_lexicon()
     test_legal_knowledge_graph_structure()
     test_certified_pdf_generation()
+    test_sovereign_intelligence_fallback()
     print("[SUCCESS] All VidhiChakshu AI Engine test cases passed successfully!")
