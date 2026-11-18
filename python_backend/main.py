@@ -1,5 +1,11 @@
 import sys
 import os
+
+# Ensure python_backend directory is in sys.path for direct services.* imports
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
 import glob
 import time
 import re
